@@ -1,0 +1,44 @@
+github:
+  token_env: GITHUB_TOKEN
+  api_base: "https://api.github.com"
+  api_version: "2022-11-28"
+  per_page: 100
+  max_workers: 4
+  retry_count: 5
+  request_timeout_seconds: 60
+  sleep_on_rate_limit: true
+
+dataset:
+  min_discussion_comments: 2
+  min_review_comments: 2
+  min_meaningful_review_comments: 2
+  min_changed_files: 2
+  max_changed_files: 30
+  min_diff_lines: 50
+  max_diff_lines: 2000
+  require_linked_issue: true
+  require_source_patch: true
+  store_full_diff: true
+
+filters:
+  exclude_bots: true
+  exclude_docs_only: true
+  exclude_lockfile_only: true
+  exclude_generated_vendor_only: true
+  exclude_trivial_review_comments: true
+
+audit:
+  accepted_sample_size: 150
+  rejected_sample_size: 50
+  borderline_sample_size: 50
+  random_seed: 42
+
+output:
+  raw_path: "data/raw/enriched_prs_raw.jsonl"
+  failed_path: "data/raw/enriched_prs_failed.jsonl"
+  accepted_path: "data/processed/dataset_mvp_v0.1.accepted.jsonl"
+  rejected_path: "data/processed/dataset_mvp_v0.1.rejected.jsonl"
+  review_sft_path: "data/processed/dataset_mvp_v0.1.review_sft.jsonl"
+  issue_to_patch_sft_path: "data/processed/dataset_mvp_v0.1.issue_to_patch_sft.jsonl"
+  audit_path: "data/audit/audit_sample.csv"
+  report_path: "reports/quality_report_v0.1.md"
