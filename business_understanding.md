@@ -38,11 +38,11 @@ The project is considered a business success if all of the following criteria ar
 
 **Personnel.** The project is executed by five roles: Project Manager, Business Unit, Data Scientist, Model Developer, and Business Analyst.
 
-**Data sources.** The main source is GH Archive, used through BigQuery as a candidate search index. The secondary source is the GitHub REST API, used to enrich selected pull requests with reviews, comments, files, and diffs. Both are public and free.
+**Data sources.** The main source is GH Archive, used either through BigQuery as a candidate search index or through locally downloaded hourly `.json.gz` dumps. The secondary source is the GitHub REST API, used to enrich selected pull requests with reviews, comments, files, and diffs. Both are public and free.
 
 **Compute and storage.** We use local machines with up to 16 GB GPU memory and 1–10 TB of local storage. All enrichment, filtering, feature export, and packaging are performed locally.
 
-**Software.** The implemented pipeline is a Python CLI codebase using `requests`, `pandas`, `PyYAML`, and `PyArrow`. Candidate discovery is done in BigQuery and exported to CSV. For modeling we use scikit-learn and XGBoost. For visualization and reporting we use matplotlib, seaborn, and Power BI where needed. The codebase is stored in a private GitHub repository with Python modules and selected notebooks for modeling and analysis.
+**Software.** The implemented pipeline is a Python CLI codebase using `requests`, `pandas`, `PyYAML`, and `PyArrow`. Candidate discovery can be done either in BigQuery or from local GH Archive hourly dumps, both producing the same candidate CSV format for downstream enrichment. For modeling we use scikit-learn and XGBoost. For visualization and reporting we use matplotlib, seaborn, and Power BI where needed. The codebase is stored in a private GitHub repository with Python modules and selected notebooks for modeling and analysis.
 
 ### Requirements, Assumptions, Constraints
 
@@ -114,7 +114,7 @@ The data mining goal of this project is to build an end-to-end pipeline that tra
 
 Concretely, the pipeline must:
 
-1. Identify promising merged PR candidates from GH Archive using BigQuery.
+1. Identify promising merged PR candidates from GH Archive using either BigQuery or locally downloaded hourly dumps.
 2. Enrich those candidates through the GitHub REST API with pull request metadata, files, reviews, review comments, issue comments, linked issue data, and diffs.
 3. Apply rule-based filters to remove bot-generated events, trivial documentation-only changes, lockfile-only changes, generated code changes, and oversized PRs.
 4. Score the resulting traces and split them into accepted and rejected examples.
@@ -160,7 +160,7 @@ The project follows the six phases of CRISP-DM plus a final packaging phase.
 
 ### Initial Assessment of Tools and Techniques
 
-For candidate discovery we use BigQuery over GH Archive and export candidate tables to CSV. For enrichment we use a Python CLI pipeline with synchronous GitHub REST API calls, conservative concurrency, and resumable JSONL checkpoints. For filtering and linking we use Python rule-based logic over enriched traces. For modeling we use logistic regression as a sanity baseline and XGBoost as the main baseline. For packaging we use JSONL as the working format and PyArrow-based Parquet export as the release format.
+For candidate discovery we use either BigQuery over GH Archive or a local hourly-dump parsing path, both of which export candidate rows to CSV. For enrichment we use a Python CLI pipeline with synchronous GitHub REST API calls, conservative concurrency, and resumable JSONL checkpoints. For filtering and linking we use Python rule-based logic over enriched traces. For modeling we use logistic regression as a sanity baseline and XGBoost as the main baseline. For packaging we use JSONL as the working format and PyArrow-based Parquet export as the release format.
 
 ## Overview of the Next CRISP-DM Phases
 
@@ -178,7 +178,7 @@ The Business Analyst prepares the visualizations for this phase, and the Project
 
 The goal of this phase is to turn raw candidate events into the final structured dataset and make it ready for modeling and release packaging.
 
-The Data Scientist owns the pipeline: query GH Archive in BigQuery, export candidate PRs to CSV, enrich selected PRs through the GitHub API, filter noisy traces, build accepted/rejected JSONL outputs, and export Parquet. The Model Developer defines the flat feature schema and repo-level split strategy. The Business Analyst prepares before/after filtering visuals.
+The Data Scientist owns the pipeline: retrieve GH Archive candidates either from BigQuery or from local hourly dumps, export candidate PRs to CSV, enrich selected PRs through the GitHub API, filter noisy traces, build accepted/rejected JSONL outputs, and export Parquet. The Model Developer defines the flat feature schema and repo-level split strategy. The Business Analyst prepares before/after filtering visuals.
 
 ### Modeling
 

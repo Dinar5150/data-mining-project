@@ -7,7 +7,7 @@ github:
   retry_count: 5
   request_timeout_seconds: 60
   sleep_on_rate_limit: true
-  progress_interval: 100
+  progress_interval: 10
 
 dataset:
   min_discussion_comments: 2

@@ -8,7 +8,7 @@ Issue -> Discussion -> PR -> Review -> Code Diff -> Merge
 
 The pipeline follows a strict MVP shape:
 
-1. Use GH Archive in BigQuery to find candidate merged pull requests.
+1. Use GH Archive in BigQuery or local GH Archive hourly dumps to find candidate merged pull requests.
 2. Enrich those candidates via the GitHub REST API.
 3. Apply hard filters and a simple quality score.
 4. Export accepted and rejected examples for PR quality classification.
@@ -55,12 +55,46 @@ Key values to review before running:
 
 ## Candidate Discovery
 
+You can build candidate PR CSV files in two ways.
+
+### Option A: BigQuery
+
 Run the SQL templates in `sql/` against GH Archive in BigQuery.
 
 - [sql/01_candidate_prs.sql](/C:/Users/Dinar/Desktop/GitHub%20projects/data-mining-project/sql/01_candidate_prs.sql) builds the candidate table.
 - [sql/02_candidate_stats.sql](/C:/Users/Dinar/Desktop/GitHub%20projects/data-mining-project/sql/02_candidate_stats.sql) inspects distribution and samples.
 
 Export the resulting table to CSV and place it at `data/candidates/candidate_prs_2025.csv` or pass a different path to the CLI.
+
+### Option B: Local GH Archive hourly dumps
+
+Download hourly `.json.gz` files and build the candidate CSV locally with the same event-level candidate filters as the SQL path.
+
+If you already have `wget` in a Unix-like shell, the January 2015 download looks like:
+
+```bash
+wget https://data.gharchive.org/2015-01-{01..31}-{0..23}.json.gz
+```
+
+Note: this brace expansion works in Bash-like shells, not in standard PowerShell. On Windows PowerShell, prefer the built-in downloader below.
+
+If you want a shell-independent method, use the built-in downloader:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline download-gharchive --start-date 2015-01-01 --end-date 2015-01-31 --output-dir data/gharchive/2015-01
+```
+
+Then build the candidate CSV:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline candidates-from-gharchive --input-glob "data/gharchive/2015-01/*.json.gz" --output data/candidates/candidate_prs_2015_01.csv
+```
+
+For a smoke test you can limit the number of hourly files:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline candidates-from-gharchive --input-glob "data/gharchive/2015-01/*.json.gz" --output data/candidates/candidate_prs_2015_01_smoke.csv --limit-files 24
+```
 
 ## CLI Workflow
 

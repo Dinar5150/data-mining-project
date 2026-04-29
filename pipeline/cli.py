@@ -12,6 +12,7 @@ from pipeline.enrich import run_enrichment
 from pipeline.export_jsonl import iter_jsonl, truncate_jsonl, write_jsonl
 from pipeline.features import export_feature_tables
 from pipeline.filters import evaluate_example
+from pipeline.gharchive import build_candidates_from_gharchive, download_gharchive_slice
 from pipeline.parquet_export import export_trace_parquet
 from pipeline.report import write_quality_report
 from pipeline.schema import build_dataset_example
@@ -73,6 +74,52 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional row offset when reading the candidate CSV.",
     )
 
+    download_parser = subparsers.add_parser(
+        "download-gharchive",
+        help="Download GH Archive hourly .json.gz files for a date range.",
+    )
+    download_parser.add_argument(
+        "--start-date",
+        required=True,
+        help="Start date in YYYY-MM-DD format.",
+    )
+    download_parser.add_argument(
+        "--end-date",
+        required=True,
+        help="End date in YYYY-MM-DD format.",
+    )
+    download_parser.add_argument(
+        "--output-dir",
+        required=True,
+        help="Directory where downloaded .json.gz files will be stored.",
+    )
+    download_parser.add_argument(
+        "--no-skip-existing",
+        action="store_true",
+        help="Redownload files even if they already exist locally.",
+    )
+
+    candidates_parser = subparsers.add_parser(
+        "candidates-from-gharchive",
+        help="Build candidate CSV from locally downloaded GH Archive hourly files.",
+    )
+    candidates_parser.add_argument(
+        "--input-glob",
+        required=True,
+        help="Glob pattern for local GH Archive .json.gz files, e.g. data/gharchive/2015-01-*.json.gz",
+    )
+    candidates_parser.add_argument(
+        "--output",
+        required=True,
+        help="Destination CSV path for candidate PR rows.",
+    )
+    candidates_parser.add_argument(
+        "--limit-files",
+        type=int,
+        default=None,
+        help="Optional limit on the number of hourly files to scan.",
+    )
+
     subparsers.add_parser("process", help="Build accepted and rejected datasets from raw JSONL.")
     subparsers.add_parser("split", help="Split processed examples by repository into train/val/test JSONL.")
     subparsers.add_parser("features", help="Export flat feature tables for train/val/test splits.")
@@ -112,6 +159,25 @@ def main() -> None:
             offset=args.offset,
         )
         _print_stats("enrich", stats)
+        return
+
+    if args.command == "download-gharchive":
+        stats = download_gharchive_slice(
+            output_dir=Path(args.output_dir),
+            start_date=args.start_date,
+            end_date=args.end_date,
+            skip_existing=not args.no_skip_existing,
+        )
+        _print_stats("download-gharchive", stats)
+        return
+
+    if args.command == "candidates-from-gharchive":
+        stats = build_candidates_from_gharchive(
+            input_glob=args.input_glob,
+            output_csv=Path(args.output),
+            limit_files=args.limit_files,
+        )
+        _print_stats("candidates-from-gharchive", stats)
         return
 
     if args.command == "process":
