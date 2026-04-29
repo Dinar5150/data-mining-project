@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections import Counter
 from typing import Any
 
 from pipeline.config import DatasetConfig, FilterConfig
@@ -34,8 +35,13 @@ GENERATED_OR_VENDOR_PATHS = {
     "build/",
     "generated/",
     "gen/",
+    "__generated__/",
+    "autogen/",
+    "migrations/",
     "node_modules/",
     "third_party/",
+    ".pb.",
+    ".generated.",
 }
 SOURCE_EXTS = {
     ".py",
@@ -57,6 +63,27 @@ SOURCE_EXTS = {
     ".swift",
     ".kt",
     ".scala",
+}
+LANGUAGE_BY_EXT = {
+    ".py": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".go": "go",
+    ".java": "java",
+    ".rs": "rust",
+    ".cpp": "c++",
+    ".cc": "c++",
+    ".hpp": "c++",
+    ".c": "c/c++",
+    ".h": "c/c++",
+    ".cs": "c#",
+    ".rb": "ruby",
+    ".php": "php",
+    ".swift": "swift",
+    ".kt": "kotlin",
+    ".scala": "scala",
 }
 TRIVIAL_REVIEW_PHRASES = {
     "lgtm",
@@ -100,6 +127,28 @@ def is_generated_or_vendor(path: str) -> bool:
 
 def is_source_file(path: str) -> bool:
     return file_ext(path) in SOURCE_EXTS
+
+
+def source_file_language(path: str) -> str | None:
+    return LANGUAGE_BY_EXT.get(file_ext(path))
+
+
+def source_language_counts(paths: list[str]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for path in paths:
+        if not is_source_file(path):
+            continue
+        language = source_file_language(path)
+        if language:
+            counts[language] += 1
+    return counts
+
+
+def top_source_language(paths: list[str]) -> str:
+    counts = source_language_counts(paths)
+    if not counts:
+        return "unknown"
+    return counts.most_common(1)[0][0]
 
 
 def is_meaningful_review_comment(body: str | None) -> bool:

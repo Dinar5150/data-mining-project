@@ -3,10 +3,11 @@ github:
   api_base: "https://api.github.com"
   api_version: "2022-11-28"
   per_page: 100
-  max_workers: 4
+  max_workers: 2
   retry_count: 5
   request_timeout_seconds: 60
   sleep_on_rate_limit: true
+  progress_interval: 100
 
 dataset:
   min_discussion_comments: 2
@@ -33,12 +34,30 @@ audit:
   borderline_sample_size: 50
   random_seed: 42
 
+split:
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  random_seed: 42
+
 output:
   raw_path: "data/raw/enriched_prs_raw.jsonl"
   failed_path: "data/raw/enriched_prs_failed.jsonl"
   accepted_path: "data/processed/dataset_mvp_v0.1.accepted.jsonl"
   rejected_path: "data/processed/dataset_mvp_v0.1.rejected.jsonl"
+  accepted_parquet_path: "data/processed/dataset_mvp_v0.1.accepted.parquet"
+  rejected_parquet_path: "data/processed/dataset_mvp_v0.1.rejected.parquet"
+  train_path: "data/processed/dataset_mvp_v0.1.train.jsonl"
+  val_path: "data/processed/dataset_mvp_v0.1.val.jsonl"
+  test_path: "data/processed/dataset_mvp_v0.1.test.jsonl"
+  train_features_csv_path: "data/processed/dataset_mvp_v0.1.train.features.csv"
+  val_features_csv_path: "data/processed/dataset_mvp_v0.1.val.features.csv"
+  test_features_csv_path: "data/processed/dataset_mvp_v0.1.test.features.csv"
+  train_features_parquet_path: "data/processed/dataset_mvp_v0.1.train.features.parquet"
+  val_features_parquet_path: "data/processed/dataset_mvp_v0.1.val.features.parquet"
+  test_features_parquet_path: "data/processed/dataset_mvp_v0.1.test.features.parquet"
   review_sft_path: "data/processed/dataset_mvp_v0.1.review_sft.jsonl"
   issue_to_patch_sft_path: "data/processed/dataset_mvp_v0.1.issue_to_patch_sft.jsonl"
   audit_path: "data/audit/audit_sample.csv"
   report_path: "reports/quality_report_v0.1.md"
+  data_card_path: "data/processed/DATASET_CARD.md"

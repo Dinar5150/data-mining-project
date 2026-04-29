@@ -102,6 +102,7 @@ def build_dataset_example(
             "title": pr.get("title"),
             "body": pr.get("body"),
             "author": compact_user(pr.get("user")),
+            "author_association": pr.get("author_association"),
             "created_at": pr.get("created_at"),
             "updated_at": pr.get("updated_at"),
             "closed_at": pr.get("closed_at"),
@@ -129,7 +130,7 @@ def build_dataset_example(
         "provenance": {
             "source": "gharchive_bigquery_plus_github_rest_api",
             "retrieved_at": enriched.get("retrieved_at"),
-            "candidate_source": "githubarchive.year.2025",
+            "candidate_source": "gharchive_bigquery_candidates",
             "api_errors": enriched.get("api_errors", []),
         },
     }

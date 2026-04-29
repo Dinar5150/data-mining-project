@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -13,6 +14,7 @@ from pipeline.config import AppConfig
 from pipeline.export_jsonl import append_jsonl, iter_jsonl
 from pipeline.github_client import GitHubClient
 
+LOGGER = logging.getLogger(__name__)
 CLOSING_RE = re.compile(
     r"(?i)\b(fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\s+#(\d+)"
 )
@@ -43,17 +45,24 @@ def read_candidates(
     csv_path: str | Path,
     limit: int | None = None,
     offset: int = 0,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], int]:
     rows: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    duplicates_removed = 0
     with Path(csv_path).open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
         for index, row in enumerate(reader):
             if index < offset:
                 continue
+            key = candidate_key(row["repo_name"], row["pr_number"])
+            if key in seen_keys:
+                duplicates_removed += 1
+                continue
+            seen_keys.add(key)
             rows.append(row)
             if limit is not None and len(rows) >= limit:
                 break
-    return rows
+    return rows, duplicates_removed
 
 
 def load_seen_keys(paths: Iterable[str | Path]) -> set[str]:
@@ -201,7 +210,11 @@ def run_enrichment(
     limit: int | None = None,
     offset: int = 0,
 ) -> dict[str, int]:
-    candidates = read_candidates(candidates_path, limit=limit, offset=offset)
+    candidates, duplicates_removed = read_candidates(
+        candidates_path,
+        limit=limit,
+        offset=offset,
+    )
     seen = load_seen_keys((config.output.raw_path, config.output.failed_path))
     pending = [
         row
@@ -211,15 +224,27 @@ def run_enrichment(
 
     stats = {
         "candidate_rows": len(candidates),
+        "duplicates_removed": duplicates_removed,
         "already_seen": len(candidates) - len(pending),
         "submitted": len(pending),
         "succeeded": 0,
         "failed": 0,
     }
 
+    LOGGER.info(
+        "Loaded %s unique candidates from %s (%s duplicates removed, %s already seen).",
+        len(candidates),
+        candidates_path,
+        duplicates_removed,
+        stats["already_seen"],
+    )
+
     if not pending:
+        LOGGER.info("No pending candidates left to enrich.")
         return stats
 
+    processed = 0
+    progress_interval = max(config.github.progress_interval, 1)
     with ThreadPoolExecutor(max_workers=config.github.max_workers) as executor:
         futures = {
             executor.submit(_run_enrich_candidate, candidate, config): candidate
@@ -232,9 +257,30 @@ def run_enrichment(
             except Exception as exc:
                 append_jsonl(config.output.failed_path, _failure_row(candidate, exc))
                 stats["failed"] += 1
+                processed += 1
+                if processed % progress_interval == 0 or processed == len(pending):
+                    LOGGER.info(
+                        "Enrichment progress: processed=%s/%s succeeded=%s failed=%s skipped=%s",
+                        processed,
+                        len(pending),
+                        stats["succeeded"],
+                        stats["failed"],
+                        stats["already_seen"],
+                    )
                 continue
 
             append_jsonl(config.output.raw_path, enriched)
             stats["succeeded"] += 1
+            processed += 1
+            if processed % progress_interval == 0 or processed == len(pending):
+                LOGGER.info(
+                    "Enrichment progress: processed=%s/%s succeeded=%s failed=%s skipped=%s",
+                    processed,
+                    len(pending),
+                    stats["succeeded"],
+                    stats["failed"],
+                    stats["already_seen"],
+                )
 
+    LOGGER.info("Enrichment finished: %s", stats)
     return stats

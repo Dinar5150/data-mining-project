@@ -1,36 +1,46 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 from typing import Any
 
 from pipeline.audit import make_audit_sample
 from pipeline.config import AppConfig, load_config
+from pipeline.datacard import write_dataset_card
 from pipeline.enrich import run_enrichment
-from pipeline.export_jsonl import append_jsonl, iter_jsonl, truncate_jsonl
+from pipeline.export_jsonl import iter_jsonl, truncate_jsonl, write_jsonl
+from pipeline.features import export_feature_tables
 from pipeline.filters import evaluate_example
+from pipeline.parquet_export import export_trace_parquet
 from pipeline.report import write_quality_report
 from pipeline.schema import build_dataset_example
 from pipeline.sft import export_sft_datasets
+from pipeline.split import split_examples_by_repo
 
 
 def process_enriched(config: AppConfig) -> dict[str, int]:
     truncate_jsonl(config.output.accepted_path)
     truncate_jsonl(config.output.rejected_path)
 
+    accepted_examples: list[dict[str, Any]] = []
+    rejected_examples: list[dict[str, Any]] = []
     stats = {"processed": 0, "accepted": 0, "rejected": 0}
     for enriched in iter_jsonl(config.output.raw_path):
         quality = evaluate_example(enriched, config.dataset, config.filters)
         example = build_dataset_example(enriched, quality)
-        output_path = (
-            config.output.accepted_path if quality["accepted"] else config.output.rejected_path
-        )
-        append_jsonl(output_path, example)
         stats["processed"] += 1
         if quality["accepted"]:
+            accepted_examples.append(example)
             stats["accepted"] += 1
         else:
+            rejected_examples.append(example)
             stats["rejected"] += 1
+
+    accepted_examples.sort(key=lambda row: row.get("example_id", ""))
+    rejected_examples.sort(key=lambda row: row.get("example_id", ""))
+    write_jsonl(config.output.accepted_path, accepted_examples)
+    write_jsonl(config.output.rejected_path, rejected_examples)
     return stats
 
 
@@ -64,10 +74,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers.add_parser("process", help="Build accepted and rejected datasets from raw JSONL.")
+    subparsers.add_parser("split", help="Split processed examples by repository into train/val/test JSONL.")
+    subparsers.add_parser("features", help="Export flat feature tables for train/val/test splits.")
+    subparsers.add_parser("export-parquet", help="Export accepted and rejected traces to Parquet.")
     subparsers.add_parser("sft", help="Export SFT datasets from accepted traces.")
     subparsers.add_parser("audit", help="Generate a human audit CSV sample.")
     subparsers.add_parser("report", help="Generate a markdown quality report.")
-    subparsers.add_parser("finalize", help="Run process, sft export, audit, and report.")
+    subparsers.add_parser("data-card", help="Generate a dataset card from processed outputs.")
+    subparsers.add_parser(
+        "finalize",
+        help="Run process, split, features, Parquet export, SFT export, audit, report, and data card.",
+    )
 
     return parser
 
@@ -79,6 +96,10 @@ def _print_stats(command: str, stats: dict[str, Any]) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     parser = build_parser()
     args = parser.parse_args()
     config = load_config(args.config)
@@ -97,6 +118,18 @@ def main() -> None:
         _print_stats("process", process_enriched(config))
         return
 
+    if args.command == "split":
+        _print_stats("split", split_examples_by_repo(config))
+        return
+
+    if args.command == "features":
+        _print_stats("features", export_feature_tables(config))
+        return
+
+    if args.command == "export-parquet":
+        _print_stats("export-parquet", export_trace_parquet(config))
+        return
+
     if args.command == "audit":
         _print_stats("audit", make_audit_sample(config))
         return
@@ -109,15 +142,27 @@ def main() -> None:
         _print_stats("report", write_quality_report(config))
         return
 
+    if args.command == "data-card":
+        _print_stats("data-card", write_dataset_card(config))
+        return
+
     if args.command == "finalize":
         process_stats = process_enriched(config)
+        split_stats = split_examples_by_repo(config)
+        feature_stats = export_feature_tables(config)
+        parquet_stats = export_trace_parquet(config)
         sft_stats = export_sft_datasets(config)
         audit_stats = make_audit_sample(config)
         report_stats = write_quality_report(config)
+        data_card_stats = write_dataset_card(config)
         _print_stats("process", process_stats)
+        _print_stats("split", split_stats)
+        _print_stats("features", feature_stats)
+        _print_stats("export-parquet", parquet_stats)
         _print_stats("sft", sft_stats)
         _print_stats("audit", audit_stats)
         _print_stats("report", report_stats)
+        _print_stats("data-card", data_card_stats)
         return
 
     parser.error(f"Unsupported command: {args.command}")

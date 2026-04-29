@@ -11,8 +11,8 @@ The pipeline follows a strict MVP shape:
 1. Use GH Archive in BigQuery to find candidate merged pull requests.
 2. Enrich those candidates via the GitHub REST API.
 3. Apply hard filters and a simple quality score.
-4. Export accepted and rejected examples as JSONL.
-5. Generate a small audit CSV and a markdown quality report.
+4. Export accepted and rejected examples for PR quality classification.
+5. Generate train/val/test splits, flat feature tables, Parquet exports, an audit CSV, a dataset card, and a quality report.
 
 ## Repository Layout
 
@@ -38,8 +38,8 @@ Install dependencies:
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+.\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\pip.exe install -r requirements.txt
 ```
 
 ## Config
@@ -67,37 +67,61 @@ Export the resulting table to CSV and place it at `data/candidates/candidate_prs
 Enrich raw candidates:
 
 ```bash
-python -m pipeline enrich --candidates data/candidates/candidate_prs_2025.csv --limit 1000
+.\.venv\Scripts\python.exe -m pipeline enrich --candidates data/candidates/candidate_prs_2025.csv --limit 1000
 ```
 
 Process enriched rows into accepted and rejected datasets:
 
 ```bash
-python -m pipeline process
+.\.venv\Scripts\python.exe -m pipeline process
+```
+
+Split examples by repository into train/val/test:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline split
+```
+
+Export flat feature tables for modeling:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline features
+```
+
+Export accepted and rejected traces to Parquet:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline export-parquet
 ```
 
 Generate an audit sample:
 
 ```bash
-python -m pipeline audit
+.\.venv\Scripts\python.exe -m pipeline audit
 ```
 
 Generate a markdown quality report:
 
 ```bash
-python -m pipeline report
+.\.venv\Scripts\python.exe -m pipeline report
 ```
 
 Export SFT views from the accepted trace dataset:
 
 ```bash
-python -m pipeline sft
+.\.venv\Scripts\python.exe -m pipeline sft
+```
+
+Generate a dataset card:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline data-card
 ```
 
 Run post-processing in one step:
 
 ```bash
-python -m pipeline finalize
+.\.venv\Scripts\python.exe -m pipeline finalize
 ```
 
 ## Notes
@@ -105,4 +129,5 @@ python -m pipeline finalize
 - Enrichment is resumable. The CLI skips PRs already present in the raw or failed JSONL outputs.
 - Linked issues are detected only via `fixes/closes/resolves #123` style references in the PR title/body.
 - The pipeline intentionally favors precision over recall in the accepted dataset.
-- `finalize` regenerates accepted/rejected datasets, SFT views, the audit CSV, and the quality report.
+- The baseline downstream task is PR trace quality classification: `accepted` vs `rejected`.
+- `finalize` regenerates accepted/rejected datasets, repo-level splits, feature tables, Parquet exports, SFT views, the audit CSV, the quality report, and the dataset card.
