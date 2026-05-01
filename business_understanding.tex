@@ -1,0 +1,71 @@
+\section{Business Understanding}
+
+\subsection{Determine Business Objectives}
+
+\subsubsection*{Background}
+Modern code assistants and automated review systems need data that captures not only source code, but also the engineering workflow around it. Existing public code datasets mostly provide isolated code files, commits, or code--text pairs. They rarely connect the motivating issue, pull request, discussion, review activity, and final code change into one usable record. This project addresses that gap by building a curated dataset of public GitHub workflow traces.
+
+\subsubsection*{Business Objectives}
+The business objective is to deliver a reusable dataset of public GitHub workflow traces. Each trace should connect the motivating issue, pull request metadata, discussion, review activity, code diff, quality metadata, and provenance into one structured record suitable for machine learning teams building code review or developer-assistance systems.
+
+\subsubsection*{Business Success Criteria}
+The business goal is achieved if the final release:
+\begin{itemize}
+    \item contains a curated multi-repository dataset of linked GitHub workflows, filtered to remove bots, trivial changes, generated files, documentation-only changes, and incomplete issue--pull-request--review chains;
+    \item supports at least one realistic downstream task with a model that beats simple baselines;
+    \item is valuable enough to be positioned as a niche dataset product for AI teams working on code review automation.
+\end{itemize}
+
+\subsection{Assess Situation}
+
+\subsubsection*{Inventory of Resources}
+The project uses two main data sources: GH Archive for candidate pull request discovery and the GitHub REST API for enrichment with pull request details, files, reviews, comments, linked issues, and diffs. Work is performed by the project team on local machines.
+
+\subsubsection*{Requirements, Assumptions, and Constraints}
+The dataset must use only public GitHub data and avoid paid compute or paid data services. The pipeline should remain reproducible from configuration and should export both working JSONL files and analysis-friendly tabular files.
+
+The main assumptions are that public GitHub workflows are representative enough for the project goal, that rule-based filtering can remove most unusable traces, and that a repository-level split is sufficient to reduce train/test leakage for the baseline modeling task. The main constraints are GitHub API rate limits, local compute capacity, and the availability of explicit issue--pull-request links in public repositories.
+
+\subsubsection*{Risks and Contingencies}
+\begin{itemize}
+    \item \textbf{Noisy data:} public GitHub activity contains bots, generated files, trivial changes, and incomplete workflows. The contingency is strict filtering, quality scoring, and manual audit sampling.
+    \item \textbf{Low candidate volume:} selected time windows may produce too few accepted traces. The contingency is to expand the collection window.
+    \item \textbf{Label imbalance:} the \texttt{review\_concern} positive class may be rare. The contingency is to inspect label distribution before modeling and revise the threshold if necessary.
+    \item \textbf{API limits:} enrichment may be slowed by GitHub rate limits. The contingency is resumable enrichment with retry and rate-limit-aware sleeps.
+\end{itemize}
+
+\subsubsection*{Terminology}
+A workflow trace is one structured example connecting a linked issue, pull request, discussion, review activity, code diff, quality metadata, and provenance. The downstream label \texttt{review\_concern} indicates whether reviewers raised substantive concerns after the pull request was opened.
+
+\subsubsection*{Costs and Benefits}
+The direct cost is mainly team time; data access and compute are free or local. As a conservative market benchmark, raw GitHub datasets are sold at about \$250 per 100,000 records. This project is smaller, targeting about 10,000 traces, but each trace is enriched with issue, review, discussion, and diff context. A realistic non-exclusive license price is therefore about \$1,000--\$3,000 per customer, or \$5,000--\$10,000 with refreshes and support. With five basic customers, expected revenue is about \$5,000--\$15,000; with three enterprise customers, it is about \$15,000--\$30,000. The business value is the saved engineering effort: customers avoid building a GitHub collection, enrichment, filtering, and schema pipeline themselves.
+
+\subsection{Determine Data Mining Goals}
+
+\subsubsection*{Data Mining Goals}
+The first data mining goal is corpus construction: create at least 5,000 accepted workflow traces, with a target of about 10,000 traces. One trace means one pull request-centered workflow record. Accepted means that the trace passed the project filters: merged pull request, explicit linked issue, source-code changes, non-empty diff, review and discussion activity, and no bot, generated-only, documentation-only, or trivial-change pattern.
+
+The second goal is supervised classification for \texttt{review\_concern}. Given only information available when a pull request is opened, the model should predict whether later review activity will contain substantive concerns. Positive examples include pull requests with a \texttt{CHANGES\_REQUESTED} review or at least two meaningful review comments; pull requests without review activity are excluded from this task.
+
+The supporting goals are to build a reproducible collection pipeline, export the dataset in reusable formats, and provide minimal documentation for external users.
+
+\subsubsection*{Data Mining Success Criteria}
+The dataset succeeds technically if it reaches the target size, spans the required repository and language diversity, and has at least 95\% trace completeness for linked issue, merged pull request, review activity, and non-empty diff. A manual audit sample should find unsuitable accepted traces below 10\%.
+
+The modeling task succeeds if the held-out test result has ROC-AUC above random and F1 above a majority-class baseline. These thresholds are intentionally modest because the purpose is to prove that the dataset carries learnable signal, not to produce a production model.
+
+\subsection{Produce Project Plan}
+
+\subsubsection*{Project Plan}
+The project follows the CRISP-DM sequence with expected iteration:
+\begin{enumerate}
+    \item complete business understanding and fix the dataset objective, target users, risks, and success criteria;
+    \item collect and inspect candidate and enriched GitHub data;
+    \item prepare accepted traces, implement \texttt{review\_concern}, split data by repository, and export feature tables;
+    \item train baseline models, starting with logistic regression and then XGBoost, with optional text embeddings if time permits;
+    \item evaluate data quality and model performance against the success criteria;
+    \item package the dataset, reference model, dataset card, quality report, and usage documentation.
+\end{enumerate}
+
+\subsubsection*{Initial Assessment of Tools and Techniques}
+The selected toolset is intentionally standard: Python for the pipeline, GH Archive and the GitHub REST API for data acquisition, \texttt{pandas} and \texttt{pyarrow} for tabular processing, \texttt{scikit-learn} for the logistic regression baseline, and XGBoost for the main tabular model. This matches the requirement that the dataset be easy to reproduce and consume in a normal Python environment.

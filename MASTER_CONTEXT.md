@@ -2,7 +2,7 @@
 
 > **Single source of truth** for the Muhomory GitHub Workflow Dataset project.
 > This document follows the **CRISP-DM** methodology in its first part, and contains additional operational sections at the end.
-> When this document and the code disagree, **the code wins**. When this document and `business_understanding.md` disagree, **this document wins**.
+> When this document and the code disagree, **the code wins**. Current CRISP-DM report fragments are `business_understanding.tex` and `data_understanding.tex`.
 
 ---
 
@@ -54,27 +54,15 @@ The Muhomory GitHub Workflow Dataset project addresses this gap. It delivers a c
 
 #### 1.1.2 Business Objectives
 
-The **primary** business objective of the project is to deliver a curated dataset of software engineering workflow traces, in which each example couples a linked issue, pre-merge discussion, pull request metadata, review activity, and the full code diff into a single structured record. The dataset must be usable by an external ML team without additional cleaning, and it must be accompanied by the documentation a commercial data product is expected to carry.
-
-The **secondary** business objectives are:
-
-- to build a reusable pipeline that can extend the dataset to new time slices of GitHub activity;
-- to train a baseline model on a realistic downstream task as evidence that the dataset carries predictive signal;
-- to produce the commercial and technical documentation artifacts that let an external team adopt the dataset with minimal friction.
-
-The underlying business question is whether public GitHub activity, once filtered and restructured into workflow traces, yields a dataset of sufficient structure and quality to be used commercially by AI companies building code-related ML systems.
+The business objective is to deliver a reusable dataset of public GitHub workflow traces. Each trace should connect the motivating issue, pull request metadata, discussion, review activity, code diff, quality metadata, and provenance into one structured record suitable for machine learning teams building code review or developer-assistance systems.
 
 #### 1.1.3 Business Success Criteria
 
-The project will be considered successful if all of the following criteria are met together.
+The business goal is achieved if the final release:
 
-| # | Criterion | Verifiable via |
-|---|---|---|
-| 1 | Dataset covers at least three mainstream programming languages, including Python | Language distribution in the dataset card |
-| 2 | Dataset supports at least one realistic downstream task, evidenced by a baseline model that strictly outperforms a random baseline on held-out data | Evaluation scorecard |
-| 3 | Dataset loads in a standard Python environment using `pandas` or `pyarrow` without additional cleaning scripts | Deployment guide |
-| 4 | A short product description articulates the value proposition, customer segments, and two or three example use cases | Product one-pager |
-| 5 | The project is executed on the team's existing local hardware with no external paid services | Repository state |
+- contains a curated multi-repository dataset of linked GitHub workflows, filtered to remove bots, trivial changes, generated files, documentation-only changes, and incomplete issue-to-pull-request-to-review chains;
+- supports at least one realistic downstream task with a model that beats simple baselines;
+- is valuable enough to be positioned as a niche dataset product for AI teams working on code review automation.
 
 ### 1.2 Assess Situation
 
@@ -110,15 +98,15 @@ A full glossary of project-specific terms, phrased in plain language, is provide
 
 #### 1.2.5 Costs and Benefits
 
-The direct cost of the project consists of the team's time and the negligible bandwidth cost of downloading GH Archive dumps and calling the GitHub REST API on a free personal token. No paid services, no cloud compute, and no commercial data sources are used. The expected benefit is a curated dataset and a working pipeline that together serve as the foundation for a future commercial offering, together with the experience of building an end-to-end CRISP-DM data product.
+The direct cost is mainly team time; data access and compute are free or local. As a conservative benchmark, raw GitHub datasets are sold at about $250 per 100,000 records. This project targets a smaller but richer dataset: about 10,000 enriched workflow traces with issue, review, discussion, and diff context. A realistic non-exclusive license price is about $1,000-$3,000 per customer, or $5,000-$10,000 with refreshes and support. With five basic customers, expected revenue is about $5,000-$15,000; with three enterprise customers, about $15,000-$30,000. The business value is saved engineering effort: customers avoid building a GitHub collection, enrichment, filtering, and schema pipeline themselves.
 
 ### 1.3 Determine Data Mining Goals
 
 #### 1.3.1 Data Mining Goals
 
-Translated into data mining terms, the business objectives above correspond to two concrete goals.
+Translated into data mining terms, the business objective corresponds to the following goals.
 
-**Goal 1 — corpus construction.** Construct a curated corpus of at least five thousand workflow traces, with a target of approximately ten thousand, drawn from a minimum of five hundred distinct public repositories and covering at least three of the fourteen source-code file extensions the pipeline recognizes. Each trace must conform to a fixed schema consisting of seven top-level blocks — linked issue, discussion, pull request metadata, review activity, code diff, quality metadata, and provenance — and must be delivered both in a working JSONL form and in a Parquet release form.
+**Goal 1 — corpus construction.** Construct at least five thousand accepted workflow traces, with a target of about ten thousand traces. One trace is one pull request-centered workflow record. Accepted means that the trace passed the project filters: merged pull request, explicit linked issue, source-code changes, non-empty diff, review and discussion activity, and no bot, generated-only, documentation-only, or trivial-change pattern. Each accepted trace should follow the fixed schema consisting of linked issue, discussion, pull request metadata, review activity, code diff, quality metadata, and provenance.
 
 **Goal 2 — supervised classifier.** Construct a supervised binary classifier for a task named `review_concern`. Given a pull request at the moment it is opened, the classifier predicts whether reviewers will raise substantive concerns during review.
 
@@ -134,9 +122,11 @@ Three modeling variants are planned in order of increasing complexity:
 
 1. **Logistic regression** on a small hand-crafted feature subset, as a sanity baseline;
 2. **XGBoost** on the full tabular feature set, as the main baseline;
-3. **XGBoost with ModernBERT embeddings** of three text fields per example: the concatenation of pull request title and body, the linked issue body, and the pull request code diff. Used to test whether natural-language and code signal contributes additional predictive power beyond the tabular features.
+3. **XGBoost with ModernBERT embeddings** of the source-code diff, to test whether code-change signal contributes predictive power beyond the tabular features.
 
 Data is split at the repository level, so that all pull requests from a given repository fall into the same split.
+
+**Supporting goals.** Build a reproducible collection pipeline, export the dataset in reusable formats, and provide minimal documentation for external users.
 
 #### 1.3.2 Data Mining Success Criteria
 
@@ -171,7 +161,7 @@ The project consumes a single data pipeline run on a larger time window than the
 
 #### 1.4.2 Initial Assessment of Tools and Techniques
 
-The pipeline is implemented in Python with a small, conventional stack: `requests` for HTTP, `pandas` and `pyarrow` for tabular handling and Parquet, and standard library tooling elsewhere. Modeling uses `scikit-learn` for logistic regression, `xgboost` for gradient-boosted trees, and the `transformers` library for ModernBERT embeddings. Evaluation uses `scikit-learn` metrics. This toolset is deliberately mainstream, because one of the business success criteria is that the dataset be consumable in a standard Python environment.
+The pipeline is implemented in Python with a small, conventional stack: `requests` for HTTP, `pandas` and `pyarrow` for tabular handling and Parquet, and standard library tooling elsewhere. Modeling uses `scikit-learn` for logistic regression, `xgboost` for gradient-boosted trees, and MLX-backed ModernBERT embeddings on local Apple Silicon. Evaluation uses `scikit-learn` metrics. This toolset is deliberately mainstream, because one of the business success criteria is that the dataset be consumable in a standard Python environment.
 
 ### 1.5 Users and Use Cases
 
@@ -198,52 +188,56 @@ Two user groups are targeted explicitly.
 
 ### 2.1 Collect Initial Data
 
-Data collection proceeds in two stages that correspond to the two data sources identified in the previous phase.
+Data collection has two stages.
 
-**Stage 1 — candidate discovery.** The pipeline queries GH Archive, either through the BigQuery SQL file `sql/01_candidate_prs.sql` or, as a fallback, through the local hourly dumps downloaded by `pipeline/gharchive.py`. The result is a candidate table in CSV form, in which each row corresponds to one merged pull request together with the counts of events it produced. The current `dataset_mvp_v0.1` release was built from GH Archive data for March 2025 and yielded approximately seventy-five hundred enriched pull requests. Data collection for the final `dataset_v1.0` release targets approximately ten thousand traces drawn from the first weeks of several months of 2026 and is currently in progress.
+**Stage 1 — candidate discovery.** Candidate pull requests were selected from GH Archive by finding merged pull request events and joining them with issue comment, review, and review comment activity for the same repository and pull request number. The candidate filter kept pull requests with 2-30 changed files, 50-2000 changed lines, at least two issue comment events, at least one review event, and at least two review comment events. The SQL path is `sql/01_candidate_prs.sql`; the local fallback is implemented in `pipeline/gharchive.py`.
 
-**Stage 2 — enrichment.** The pipeline enriches each candidate by issuing eight GitHub REST API calls that retrieve the full pull request object, the file list with per-file patches, the formal reviews, the inline review comments, the pull request conversation comments, the linked issue with its comments where a linked issue can be detected, and the complete unified diff. A linked issue is detected by a regular expression over the pull request body that matches the closing keywords `fix`, `fixes`, `close`, `closes`, `resolve`, and `resolves` followed by a hash and an issue number. Cross-repository issue references are not followed; pull requests whose only linked issue lives in a different repository are treated as having no linked issue and are ultimately rejected by the linked-issue filter.
+**Stage 2 — GitHub REST enrichment.** Each candidate was enriched with the full pull request object, changed-file list, formal reviews, inline review comments, pull request comments, the full unified diff, and linked issue data when available. Linked issues are detected from closing-keyword references such as `fixes #123` in the pull request title or body. Cross-repository issue references are not followed.
 
-The output is an append-only JSONL file at `data/raw/enriched_prs_raw.jsonl`, complemented by a failures file at `data/raw/enriched_prs_failed.jsonl` that records pull requests for which enrichment could not be completed. The initial data collection report for the final release will be produced together with the data understanding notebook, once `dataset_v1.0` data collection concludes.
+The current raw collected file is `enriched_prs_raw.jsonl` in the repository root. It contains the March 2025 MVP slice and is the source used by the Data Understanding notebook and report.
 
 ### 2.2 Describe Data
 
-At the surface level the data has the following properties.
+The raw file contains 7,563 enriched pull request records and occupies about 1.2 GB. It covers 4,758 repositories and 6,529 authors. Most pull requests were created and merged in March 2025; enrichment was retrieved on April 30, 2026 and May 1, 2026.
 
-The **candidate table** contains identifiers and event counts for merged pull requests, including the repository name, the pull request number, the pull request URL, title, body, merge commit SHA, the counts of additions, deletions, and changed files, and the counts of issue comment, review, and review comment events observed in the window.
-
-The **enriched JSONL** contains one object per pull request, whose structure mirrors the seven-block trace schema documented in section 9.
-
-At the **processed layer** the data is split into accepted and rejected traces; the accepted traces are further split by repository into train, validation, and test partitions in an eighty-ten-ten ratio with seed forty-two; and flat feature tables are exported for each split in both CSV and Parquet form.
-
-The MVP release produced approximately seventy-five hundred enriched pull requests, whose full description report is pending the final data collection. The description report will populate the counts of candidates, enriched traces, failed enrichments with failure breakdown, accepted and rejected traces, the distribution of reject reasons, language distribution in the accepted set, the number of unique repositories and the top twenty repositories by trace count, the distribution of diff sizes, the distribution of review activity, the rate of linked-issue presence, and the label distribution of `review_concern` once implemented.
+Each raw record contains `candidate`, `pr`, `files`, `reviews`, `review_comments`, `pr_comments`, `full_diff`, `linked_issue`, `linked_issue_comments`, `api_errors`, and `retrieved_at`. This is the enriched raw layer, not yet the final accepted dataset. The processed trace schema is still defined by section 9.
 
 ### 2.3 Explore Data
 
-Data exploration is performed in the notebook `notebooks/01_data_understanding.ipynb`, which is planned but not yet authored. The exploration is expected to address three families of questions.
+Data exploration is implemented in `notebooks/01_data_understanding.ipynb`. The notebook is code-only, contains no markdown cells, and was executed successfully with the `~/.venvs/general/` environment.
 
-- **Distributions.** The shapes of the changed-files, additions, deletions, and diff-lines distributions in the accepted set, together with the distribution of review comment counts and of discussion counts.
-- **Relations between attributes.** The association between pull request size and review activity, between author association and review outcomes, and between the presence of a linked issue and the downstream label.
-- **Sub-populations.** Whether language or repository concentration affects the label distribution in ways that could bias modeling.
+The notebook computes compact per-record statistics without storing full diff text in memory. It produces summary tables for completeness, repositories, languages, extensions, review states, rejection reasons, and numeric distributions. It also generates the following figures under `figures/data_understanding/`:
 
-The consolidated output will be the data exploration report, delivered as the rendered notebook together with a short narrative summary.
+- `collection_timeline.png`
+- `schema_completeness.png`
+- `size_distributions.png`
+- `review_activity.png`
+- `language_distribution.png`
+- `quality_filters.png`
+- `repo_concentration.png`
+
+Observed exploration results:
+
+- top repositories by raw record count include `llvm/llvm-project` (77), `kubernetes/kubernetes` (45), and `openshift/release` (42);
+- most common source languages by changed files are TypeScript, Python, Go, Java, Rust, and JavaScript;
+- median pull request size is 5 changed files and 186 changed lines;
+- median review activity is 6 formal reviews and 6 inline review comments;
+- the current raw `review_concern` definition is positive for 94.5% of records, mostly because candidate discovery already required review comment activity.
 
 ### 2.4 Verify Data Quality
 
-Data quality is verified along three axes.
+Raw enrichment quality is sufficient for analysis, but the file is not yet the final curated dataset.
 
-- **Completeness** is measured as the proportion of accepted traces in which all seven schema blocks are populated, including in particular a non-null linked issue, at least one review, and a non-empty full diff. The target is at least ninety-five percent.
-- **Correctness** is spot-checked through a hundred-trace audit sample that combines accepted traces, rejected traces, and borderline traces with scores between sixty and eighty, generated by the `audit` pipeline command into `data/audit/audit_sample.csv` and reviewed manually.
-- **Consistency** is enforced by the schema assembly step in `pipeline/schema.py`, which applies a fixed structure to every trace.
+Completeness results on `enriched_prs_raw.jsonl`:
 
-Known quality caveats have been recorded:
+- pull request object, file list, and full diff: 100.0%;
+- formal reviews: 99.9%;
+- review comments and pull request comments: 99.7%;
+- source files: 80.9%;
+- explicit linked issue: 12.2%;
+- API error rows: 12 records, all from linked-issue lookup.
 
-- the `finalize` command has minor edge-case inconsistencies relative to running the individual stages in sequence; this does not affect data correctness when stages are run individually;
-- the linked-issue regex does not follow cross-repository references, a deliberate trade-off that slightly reduces coverage and has no impact on the quality of the accepted traces;
-- the `author_association` field is occasionally null for deleted users;
-- the full-diff endpoint can truncate very large diffs, but such pull requests are in any case rejected by the diff-size filter.
-
-The consolidated data quality report will be produced together with the evaluation scorecard in section 5.
+Under the current strict filters, 721 records pass as accepted traces, equal to 9.5% of the raw enriched file. The dominant rejection reason is `no_explicit_linked_issue` (6,639 records), followed by `no_source_patches` and `no_source_files`. The next data preparation step must either preserve the strict linked-issue requirement and expand collection volume, or revise linked-issue extraction if higher recall is required.
 
 ---
 
@@ -251,49 +245,36 @@ The consolidated data quality report will be produced together with the evaluati
 
 ### 3.1 Select Data
 
-Data selection operates on rows and columns.
+Data selection now uses all 7,563 enriched rows from `enriched_prs_raw.jsonl` for preparation. The modeling target is `review_concern`: positive if the pull request received a `CHANGES_REQUESTED` review or at least two meaningful review comments, negative if review activity exists without those signals, and excluded if review activity is absent. This leaves 7,556 labeled rows and excludes 7 rows.
 
-**Rows.** The pipeline retains only merged pull requests from public repositories, with a diff size and file count within configured bounds, authored by non-bot accounts, carrying an explicit linked issue, and exhibiting a minimum level of review and discussion activity. The detailed rules and the rationale for each exclusion are documented at the level of individual reject reasons in section 10, which serves as the formal rationale for inclusion and exclusion.
-
-**Columns.** The pipeline keeps the full schema for accepted traces, because downstream consumers are expected to use different subsets for different tasks. However, it restricts the training feature table for the `review_concern` task to pull-request-intrinsic features in order to avoid label leakage; the partitioning is described in section 4.
+Columns are restricted to pull-request-intrinsic fields and source-code patch embeddings. Review-derived counts, review states, and quality scores are retained as metadata only and are not used as model features.
 
 ### 3.2 Clean Data
 
-Cleaning happens primarily through filtering rather than through imputation, because the dataset is assembled from structured GitHub API responses whose fields are either present or meaningfully absent.
+Cleaning is implemented by `pipeline.data_preparation`. The existing hard-filter logic is reused to attach reject reasons and the accepted/rejected quality flag, but the modeling table keeps both accepted and rejected rows. Missing source patches are represented by an empty patch embedding plus explicit source-patch count and token-count features.
 
-Traces that fail any hard filter are moved to the rejected pool with the corresponding reject reasons attached, rather than being silently dropped, so that the rejected pool remains available for error analysis. Traces that pass the hard filters are scored by a weighted sum of positive signals minus penalties, documented in the operational content of this document. Trivial review comments are filtered out by a small heuristic that requires a comment to exceed thirty characters after trimming and lower-casing and to not match a short list of trivial phrases; comments that fail this filter do not count toward the meaningful review comment thresholds.
-
-The cleaning report for the final release will be produced as part of the quality report generated by the `report` pipeline command.
+The leakage check is part of cleaning: review counts, review states, meaningful-review counts, discussion counts, and quality score are excluded from the feature columns because they are observed after pull request opening.
 
 ### 3.3 Construct Data
 
-Data construction produces derived attributes and no entirely new records. Per-trace derived attributes include the following:
+Data construction produces the `review_concern` label, PR-intrinsic numeric features, one-hot language and author-association features, and a 768-dimensional ModernBERT embedding of source-code `files[].patch` text. The patch text is capped at 1,000 ModernBERT tokens per row before embedding. The embedding model is `mlx-community/nomicai-modernbert-embed-base-4bit`.
 
-- the diff-line count, computed as the sum of additions and deletions;
-- the source-file count and source-patch count, computed from the file list filtered by extension;
-- the source-file ratio, computed as the share of changed files whose extension is recognized as source code;
-- the meaningful-review-comment count, computed by applying the trivial-comment filter;
-- the discussion count, computed as the sum of pull request conversation comments and linked-issue comments;
-- the has-linked-issue indicator;
-- the has-changes-requested indicator;
-- the counts of reviews by state;
-- the top language of the trace, inferred from its source files;
-- the quality score.
-
-The `review_concern` label is itself a constructed attribute; its implementation is pending and is tracked in section 14.
+The generated modeling table contains 805 numeric features per row: 17 tabular numeric features, 20 categorical one-hot features, and 768 embedding features.
 
 ### 3.4 Integrate Data
 
-Integration combines, for each pull request, the fields extracted from the eight GitHub API responses into a single structured trace. The operation is a join across endpoints on the pair of repository name and pull request number, with a secondary join onto the linked issue when present. The output is the nested JSON object whose schema is documented in section 9.
+Integration combines pull request metadata, linked issue metadata, changed-file metadata, source patches, constructed labels, and quality metadata into one flat modeling row per pull request. Rows are split by repository with seed 42, so no repository appears in more than one split.
 
 ### 3.5 Format Data
 
-The final dataset is delivered in two formats:
+Prepared modeling artifacts are under `data/processed/modeling_v0.1/`.
 
-- **JSONL** is the working format, with one trace per line, convenient for streaming processing and for inspection with standard command-line tools;
-- **Parquet** is the release format, providing efficient columnar storage, good compression, and fast loading into `pandas` or `pyarrow`.
+- `dataset_modeling_v0.1.train.npz` and `dataset_modeling_v0.1.val.npz` are ready for `.fit()` and `.predict()` and contain `X`, `y`, feature names, and row identifiers.
+- `dataset_modeling_v0.1.train.parquet`, `dataset_modeling_v0.1.val.parquet`, `dataset_modeling_v0.1.test.parquet`, and `dataset_modeling_v0.1.all.parquet` provide inspectable tabular versions.
+- `dataset_modeling_v0.1.feature_manifest.json` records the target, feature columns, embedding columns, categories, model name, and split settings.
+- `dataset_modeling_v0.1.preparation_summary.json` records row counts, label balance, token counts, and reject-reason summary.
 
-Feature tables are delivered in both CSV and Parquet forms — CSV for human inspection and Parquet for modeling. Auxiliary files for supervised fine-tuning of language models, produced by the `sft` pipeline command, follow a chat-style message format with explicit roles and associated metadata and are delivered as JSONL.
+The split contains 6,063 train rows, 717 validation rows, and 777 test rows. The train and validation `.npz` files were smoke-tested with scikit-learn `.fit()` and `.predict()`.
 
 ---
 
@@ -305,13 +286,13 @@ Three modeling techniques are planned in order of increasing complexity.
 
 1. **Logistic regression** on a small hand-crafted subset of the pull-request-intrinsic features, as a sanity baseline. The purpose of this model is to confirm that a simple linear combination of obvious signals already beats a random baseline.
 2. **XGBoost** on the full pull-request-intrinsic feature set, as the main tabular baseline. XGBoost is chosen for its strong performance on heterogeneous tabular features, its tolerance of missing values, and the interpretability of its feature importance output.
-3. **XGBoost with ModernBERT embeddings** of three text fields per example, as an advanced variant. The three fields are the concatenation of pull request title and body, the linked issue body, and the pull request code diff. Each field is tokenized independently with right-side truncation to ModernBERT's maximum context of 8192 tokens; the code-diff field is assembled by concatenating file-level patches in their original order up to that limit. Each field produces a 768-dimensional embedding, which is then reduced by PCA to a smaller number of components and concatenated with the tabular feature set before being fed into XGBoost. The target PCA dimensionality is decided empirically on the validation set. The purpose of this variant is to assess whether natural-language and code content contributes predictive power beyond the tabular features.
+3. **XGBoost with ModernBERT embeddings** of the source-code patch text, as an advanced variant. The purpose of this variant is to assess whether code-change content contributes predictive power beyond the tabular features.
 
-The modeling assumptions are that the repository-level split prevents train/test leakage at a level sufficient for the scope of this project; that the class balance of `review_concern` on the modeling set will be sufficient to train without specialized imbalance-handling techniques; and that ModernBERT, although pretrained on natural language rather than code, produces code-diff embeddings of sufficient quality to serve as a baseline representation, with the understanding that a dedicated code encoder could be substituted in a future iteration. All three assumptions will be verified empirically before modeling. 
+The modeling assumptions are that the repository-level split prevents train/test leakage at a level sufficient for the scope of this project; that the class balance of `review_concern` on the modeling set will be sufficient to train without specialized imbalance-handling techniques; and that ModernBERT, although pretrained on natural language rather than code, produces code-diff embeddings of sufficient quality to serve as a baseline representation, with the understanding that a dedicated code encoder could be substituted in a future iteration. All three assumptions will be verified empirically before modeling.
 
 ### 4.2 Generate Test Design
 
-The test design separates the accepted data into training, validation, and test partitions at the repository level, in an **eighty-ten-ten ratio**, with **seed forty-two**, so that all pull requests from a given repository fall into the same partition. Repository-level splitting is chosen over pull-request-level splitting because pull requests from the same repository share authors, conventions, and review culture, and pull-request-level splitting would allow the model to exploit those shared characteristics rather than generalizable signal. The pull requests used for modeling are restricted to those that received review activity at all, in line with the label definition in section 1.3.1.
+The test design separates the labeled raw records into training, validation, and test partitions at the repository level, in an **eighty-ten-ten ratio**, with **seed forty-two**, so that all pull requests from a given repository fall into the same partition. Repository-level splitting is chosen over pull-request-level splitting because pull requests from the same repository share authors, conventions, and review culture, and pull-request-level splitting would allow the model to exploit those shared characteristics rather than generalizable signal. The pull requests used for modeling are restricted to those that received review activity at all, in line with the label definition in section 1.3.1.
 
 Model selection is performed on the validation set; the test set is used exactly once per model, at the end, to produce the numbers that appear in the evaluation scorecard.
 
@@ -322,7 +303,8 @@ The metrics are organized as follows:
 
 ### 4.3 Build Model
 
-Model building is planned in the notebooks `03_modeling_baselines.ipynb`, `04_modeling_xgboost.ipynb`, and `05_modeling_modernbert.ipynb`. Each notebook will record its parameter settings, the fitted model object, and a model description that covers the feature set used, the training configuration, and any preprocessing applied. For the ModernBERT-enhanced variant, the model description additionally records the tokenizer configuration, the chosen PCA dimensionality per text field, and the fitted PCA components, so that the feature extraction step is reproducible on new data. No models have been trained at the time of writing. 
+Model building is planned in the notebooks `03_modeling_baselines.ipynb`, `04_modeling_xgboost.ipynb`, and `05_modeling_modernbert.ipynb`. Each notebook will record its parameter settings, the fitted model object, and a model description that covers the feature set used, the training configuration, and any preprocessing applied. The prepared train and validation matrices are available in `data/processed/modeling_v0.1/`; no final models have been trained at the time of writing.
+
 ### 4.4 Assess Model
 
 Model assessment compares each trained model against the data mining success criteria in section 1.3.2 and against the other models in the progression. Models are ranked on the validation set by ROC-AUC and F1, with ties broken by the secondary metrics.
@@ -505,7 +487,8 @@ Plain-language definitions of every term used in this project. Grouped by topic.
 .
 ├── config.yaml                      # All pipeline parameters
 ├── requirements.txt                 # Python dependencies
-├── business_understanding.md        # CRISP-DM BU document (external deliverable)
+├── business_understanding.tex       # CRISP-DM Business Understanding report fragment
+├── data_understanding.tex           # CRISP-DM Data Understanding report fragment
 ├── pipeline/                        # Python pipeline
 │   ├── __init__.py
 │   ├── __main__.py                  # Entry point
@@ -532,19 +515,17 @@ Plain-language definitions of every term used in this project. Grouped by topic.
 │   ├── raw/                         # Enriched JSONL + failures
 │   ├── processed/                   # Accepted/rejected, splits, SFT, etc.
 │   └── audit/                       # Audit CSVs
+├── figures/                         # Report figures
+│   └── data_understanding/           # Data Understanding EDA plots
 ├── reports/                         # Generated quality reports (gitignored)
-└── notebooks/                       # (to be added) analysis notebooks
-    ├── 01_data_understanding.ipynb
-    ├── 02_data_preparation.ipynb
-    ├── 03_modeling_baselines.ipynb
-    ├── 04_modeling_xgboost.ipynb
-    ├── 05_modeling_modernbert.ipynb
-    └── 06_evaluation.ipynb
+└── notebooks/                       # Analysis notebooks
+    └── 01_data_understanding.ipynb
 ```
 
 **Naming conventions:**
 - Python files, config keys: `lower_snake_case`
 - Markdown docs: `lower_snake_case.md`
+- LaTeX report fragments: `lower_snake_case.tex`
 - Notebooks: `NN_lower_snake_case.ipynb` (NN = two-digit phase number)
 - Dataset artifacts: `dataset_{version}.{purpose}.{extension}`
 
@@ -855,15 +836,15 @@ python -m pipeline finalize
 
 | Version | Time Window | Status | Size |
 |---|---|---|---|
-| `dataset_mvp_v0.1` | March 2025 | **Complete (MVP)** | ~7500 enriched PRs |
+| `dataset_mvp_v0.1` | March 2025 | **Complete (MVP raw enrichment)** | 7563 enriched PRs |
 | `dataset_v1.0` | First weeks of several months in 2026 | **In collection** (final submission) | Target ~10000 traces |
 
 ### 13.2 CRISP-DM Phase Progress
 
 ```
-Business Understanding  ████████████████████░  95%
-Data Understanding      ████████████░░░░░░░░  60%
-Data Preparation        ████████████████░░░░  80%
+Business Understanding  ████████████████████  100%
+Data Understanding      ████████████████████  100%
+Data Preparation        ██████████████████░░  90%
 Modeling                ░░░░░░░░░░░░░░░░░░░░   0%
 Evaluation              ░░░░░░░░░░░░░░░░░░░░   0%
 Deployment              ███░░░░░░░░░░░░░░░░░  15%
@@ -872,11 +853,19 @@ Deployment              ███░░░░░░░░░░░░░░░�
 ### 13.3 Artifact Status
 
 **Complete:**
-- Full `pipeline/` module tree (15 modules)
+- Full `pipeline/` module tree (16 modules)
 - `config.yaml` populated
 - BigQuery SQL (`sql/01_candidate_prs.sql`, `sql/02_candidate_stats.sql`)
-- `business_understanding.md` (draft)
-- MVP run: ~7500 enriched PRs
+- `business_understanding.tex`
+- `data_understanding.tex`
+- `data_preparation.tex`
+- `notebooks/01_data_understanding.ipynb`
+- `notebooks/02_data_preparation.ipynb`
+- `notebooks/02_data_preparation.py`
+- Data Understanding plots in `figures/data_understanding/`
+- MVP raw enrichment: 7563 enriched PRs in `enriched_prs_raw.jsonl`
+- Modeling-ready MVP train/validation/test files in `data/processed/modeling_v0.1/`
+- `review_concern` label and no-leak feature construction in `pipeline/data_preparation.py`
 - Dataset card auto-generator
 - Quality report auto-generator
 - Audit sample generator
@@ -887,9 +876,7 @@ Deployment              ███░░░░░░░░░░░░░░░�
 - This master document
 
 **Not started:**
-- Analysis notebooks (data understanding, preparation, modeling, evaluation)
-- `review_concern` label implementation in pipeline
-- Feature partitioning (no-leak vs review-derived)
+- Modeling and evaluation notebooks
 - Baseline model (logistic regression)
 - XGBoost model
 - ModernBERT-enhanced model
@@ -907,8 +894,8 @@ Deployment              ███░░░░░░░░░░░░░░░�
 |---|---|---|---|
 | I-1 | `finalize` command has minor edge-case inconsistencies | Low | Run stages individually |
 | I-2 | Candidate CSV columns differ between BigQuery and local GH Archive | None (MVP uses BigQuery) | Stick to BigQuery path |
-| I-3 | `quality.accepted` is a curation label, not a modeling target | Blocks modeling | Implement `review_concern` label |
-| I-4 | Feature table mixes PR-intrinsic and review-derived columns | Blocks modeling | Partition features per [Section 4.2](#42-feature-partitioning) |
+| I-3 | `quality.accepted` is a curation label, not a modeling target | Resolved for MVP modeling prep | `review_concern` implemented in `pipeline/data_preparation.py` |
+| I-4 | Feature table mixes PR-intrinsic and review-derived columns | Resolved for MVP modeling prep | No-leak feature manifest written under `data/processed/modeling_v0.1/` |
 | I-5 | Linked-issue regex does not follow cross-repo references | Minor coverage loss | Accepted trade-off |
 
 ---
@@ -928,8 +915,8 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done.
 | ID | Task | Priority | Est. Effort | Status | Depends on |
 |---|---|---|---|---|---|
 | DP-1 | Complete `dataset_v1.0` data collection (2026 data) | P0 | 1–2 days | `[~]` | — |
-| DP-2 | Implement `review_concern` label in `pipeline/filters.py` or new module | P0 | 0.5 day | `[ ]` | — |
-| DP-3 | Partition features into PR-intrinsic vs review-derived groups in `pipeline/features.py` | P0 | 0.5 day | `[ ]` | DP-2 |
+| DP-2 | Implement `review_concern` label in `pipeline/filters.py` or new module | P0 | 0.5 day | `[x]` | — |
+| DP-3 | Partition features into PR-intrinsic vs review-derived groups in `pipeline/features.py` | P0 | 0.5 day | `[x]` | DP-2 |
 | DP-4 | Fix `finalize` edge-case inconsistencies | P2 | 0.5 day | `[ ]` | — |
 | DP-5 | Audit sample review (100 accepted traces, manual labeling) | P1 | 0.5 day | `[ ]` | DP-1 |
 
@@ -937,8 +924,8 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done.
 
 | ID | Task | Priority | Est. Effort | Status | Depends on |
 |---|---|---|---|---|---|
-| NB-1 | `01_data_understanding.ipynb` — EDA, distributions, reject reasons breakdown | P0 | 0.5 day | `[ ]` | DP-1 |
-| NB-2 | `02_data_preparation.ipynb` — feature analysis, label balance, split visualization | P0 | 0.5 day | `[ ]` | DP-2, DP-3 |
+| NB-1 | `01_data_understanding.ipynb` — EDA, distributions, reject reasons breakdown | P0 | 0.5 day | `[x]` | current raw enrichment |
+| NB-2 | `02_data_preparation.ipynb` — feature analysis, label balance, split visualization | P0 | 0.5 day | `[x]` | DP-2, DP-3 |
 | NB-3 | `03_modeling_baselines.ipynb` — logistic regression baseline | P0 | 0.5 day | `[ ]` | NB-2 |
 | NB-4 | `04_modeling_xgboost.ipynb` — XGBoost main baseline | P0 | 1 day | `[ ]` | NB-3 |
 | NB-5 | `05_modeling_modernbert.ipynb` — ModernBERT-enhanced variant | P1 | 1–2 days | `[ ]` | NB-4 |
@@ -948,7 +935,8 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done.
 
 | ID | Task | Priority | Est. Effort | Status | Depends on |
 |---|---|---|---|---|---|
-| DOC-1 | Update `business_understanding.md` to match this doc (task = review_concern, criteria values) | P0 | 0.5 day | `[ ]` | — |
+| DOC-1 | Business Understanding report fragment (`business_understanding.tex`) | P0 | 0.5 day | `[x]` | — |
+| DOC-1A | Data Understanding report fragment (`data_understanding.tex`) | P0 | 0.5 day | `[x]` | NB-1 |
 | DOC-2 | Evaluation scorecard (filled with measured values) | P0 | 0.25 day | `[ ]` | NB-6 |
 | DOC-3 | Product one-pager | P0 | 0.5 day | `[ ]` | NB-6 |
 | DOC-4 | Deployment guide / user-facing README for the dataset | P0 | 0.5 day | `[ ]` | DP-1 |

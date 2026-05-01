@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 .env
+.DS_Store
+enriched_prs_raw.jsonl
 
 data/candidates/*
 !data/candidates/.gitkeep

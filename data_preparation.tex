@@ -1,0 +1,21 @@
+\section{Data Preparation}
+
+\subsection{Select Data}
+
+The preparation stage uses all 7,563 records from \texttt{enriched\_prs\_raw.jsonl}. The modeling target is \texttt{review\_concern}: a pull request is positive if it has a \texttt{CHANGES\_REQUESTED} review or at least two meaningful review comments, negative if review activity exists without those signals, and excluded if review activity is absent. Only 7 records are excluded, leaving 7,556 labeled rows.
+
+\subsection{Clean Data}
+
+The raw rows are not silently discarded. The existing project filters are applied to attach quality metadata, including bot authors, missing linked issues, documentation-only changes, missing source patches, and generated/vendor-only changes. These quality fields are retained for audit but are not used as model features. Review-derived counts and review states are also excluded from the feature matrix to avoid label leakage.
+
+\subsection{Construct Data}
+
+Each row receives pull-request-intrinsic numeric features, one-hot language and author-association indicators, and a ModernBERT embedding of the source-code diff. The embedded text is the concatenation of source-code \texttt{files[].patch} values, capped at 1,000 ModernBERT tokens per pull request. The embedding model is \texttt{mlx-community/nomicai-modernbert-embed-base-4bit}, producing 768 embedding features.
+
+\subsection{Integrate Data}
+
+Pull request metadata, changed-file metadata, linked issue fields, source patches, constructed labels, and quality metadata are integrated into one modeling row per pull request. The split is repository-level with seed 42, preventing the same repository from appearing in multiple splits.
+
+\subsection{Format Data}
+
+The prepared files are written under \texttt{data/processed/modeling\_v0.1/}. The train matrix has 6,063 rows and the validation matrix has 717 rows, each with 805 numeric features. The ready-to-fit files are \texttt{dataset\_modeling\_v0.1.train.npz} and \texttt{dataset\_modeling\_v0.1.val.npz}; each contains \texttt{X}, \texttt{y}, feature names, and row identifiers. Parquet versions are also written for inspection.
