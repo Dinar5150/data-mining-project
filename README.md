@@ -104,6 +104,18 @@ Enrich raw candidates:
 .\.venv\Scripts\python.exe -m pipeline enrich --candidates data/candidates/candidate_prs_2025.csv --limit 1000
 ```
 
+Enrich a balanced random sample across all monthly candidate CSVs in a directory:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline enrich --candidates-dir data/candidates --pattern "candidate_prs_2025_*.csv" --limit-total 10000 --sample-seed 42
+```
+
+Preview the overnight selection without making GitHub API calls:
+
+```bash
+.\.venv\Scripts\python.exe -m pipeline enrich --candidates-dir data/candidates --pattern "candidate_prs_2025_*.csv" --limit-total 10000 --sample-seed 42 --dry-run
+```
+
 Process enriched rows into accepted and rejected datasets:
 
 ```bash
@@ -161,6 +173,8 @@ Run post-processing in one step:
 ## Notes
 
 - Enrichment is resumable. The CLI skips PRs already present in the raw or failed JSONL outputs.
+- Directory-mode enrichment samples from pending rows after deduplication and seen-row filtering, so `--limit-total 10000` means up to 10,000 actual API submissions.
+- Multi-file directory mode uses balanced random sampling across matched CSV files and shuffles the final selection globally before submission.
 - Linked issues are detected only via `fixes/closes/resolves #123` style references in the PR title/body.
 - The pipeline intentionally favors precision over recall in the accepted dataset.
 - The baseline downstream task is PR trace quality classification: `accepted` vs `rejected`.

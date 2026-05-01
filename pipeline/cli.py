@@ -56,22 +56,48 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     enrich_parser = subparsers.add_parser("enrich", help="Enrich candidate PRs via GitHub API.")
-    enrich_parser.add_argument(
+    enrich_input_group = enrich_parser.add_mutually_exclusive_group(required=True)
+    enrich_input_group.add_argument(
         "--candidates",
-        required=True,
         help="Path to the exported candidate CSV from BigQuery.",
+    )
+    enrich_input_group.add_argument(
+        "--candidates-dir",
+        help="Directory containing monthly candidate CSV files.",
     )
     enrich_parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="Optional limit on the number of candidate rows to process.",
+        help="Optional limit on the number of candidate rows to process in single-file mode.",
     )
     enrich_parser.add_argument(
         "--offset",
         type=int,
         default=0,
-        help="Optional row offset when reading the candidate CSV.",
+        help="Optional row offset when reading the candidate CSV in single-file mode.",
+    )
+    enrich_parser.add_argument(
+        "--pattern",
+        default="candidate_prs_*.csv",
+        help="Glob pattern used inside --candidates-dir. Default: candidate_prs_*.csv",
+    )
+    enrich_parser.add_argument(
+        "--limit-total",
+        type=int,
+        default=None,
+        help="Total number of candidates to submit across all matched files in directory mode.",
+    )
+    enrich_parser.add_argument(
+        "--sample-seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducible balanced sampling in directory mode.",
+    )
+    enrich_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show file discovery and selection stats without calling the GitHub API.",
     )
 
     download_parser = subparsers.add_parser(
@@ -152,11 +178,24 @@ def main() -> None:
     config = load_config(args.config)
 
     if args.command == "enrich":
+        if args.candidates_dir:
+            if args.offset:
+                parser.error("--offset is only supported with --candidates.")
+            if args.limit is not None:
+                parser.error("--limit is only supported with --candidates.")
+        elif args.limit_total is not None:
+            parser.error("--limit-total is only supported with --candidates-dir.")
+
         stats = run_enrichment(
             config=config,
-            candidates_path=Path(args.candidates),
+            candidates_path=Path(args.candidates) if args.candidates else None,
+            candidates_dir=Path(args.candidates_dir) if args.candidates_dir else None,
+            pattern=args.pattern,
             limit=args.limit,
+            limit_total=args.limit_total,
             offset=args.offset,
+            sample_seed=args.sample_seed,
+            dry_run=args.dry_run,
         )
         _print_stats("enrich", stats)
         return
