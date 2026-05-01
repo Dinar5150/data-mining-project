@@ -36,485 +36,380 @@
 
 ## 1. Business Understanding
 
-### 1.1 Problem Statement
+### 1.1 Determine Business Objectives
 
-Public datasets for training code-related ML systems mostly contain **isolated artifacts**:
-- Raw source code (The Stack)
-- Individual commits (CommitPack)
-- Code–text pairs (CodeSearchNet)
+#### 1.1.1 Background
 
-They **do not capture the engineering workflow** — the issue that motivated a change, the discussion around it, the diff that implemented it, and the review activity that accepted or contested it.
+Over the last several years the market for AI-assisted software engineering has matured considerably. Coding assistants, autonomous developer agents, and automated code review systems have moved from research prototypes to commercial products that are actively used inside engineering organizations. These systems are trained and evaluated on datasets of source code and code-related artifacts, and the quality of those datasets is increasingly recognized as a bottleneck on model quality.
 
-Companies building AI coding assistants, autonomous developer agents, and automated code review tools need this workflow-level data. Current alternatives are:
+The existing public resources in this space — The Stack, CommitPack, CodeSearchNet, and similar collections — focus on isolated artifacts: raw source code, individual commits, or aligned code–text pairs. They rarely capture the engineering workflow in which those artifacts are produced. The issue that motivated a change, the discussion that shaped its direction, the pull request that implemented it, and the review activity that either accepted or contested it are typically not linked together in a form that an ML team can consume directly.
 
-| Option | Problem |
-|---|---|
-| Parse GH Archive directly | Substantial engineering effort, noise, bot pollution, missing cross-event links |
-| Contract manual labeling | Expensive, not tailored to software engineering |
-| Use existing open datasets | Miss the workflow layer entirely |
+Companies building code-related AI systems are therefore forced to choose between three unattractive options:
 
-**This project fills that gap** by producing a curated dataset of software engineering workflow traces plus a baseline ML model that demonstrates the dataset carries real predictive signal.
+- parse raw GitHub event dumps themselves, which requires substantial engineering effort and still leaves them with significant noise, bot pollution, and missing cross-event links;
+- contract manual labeling, which is expensive and rarely tailored to software engineering;
+- limit themselves to existing open datasets and accept that the workflow layer is missing.
 
-### 1.2 Project Objectives
+The Muhomory GitHub Workflow Dataset project addresses this gap. It delivers a curated collection of software engineering workflow traces assembled from public GitHub activity, together with a baseline machine learning model that demonstrates the dataset carries real predictive signal on a realistic downstream task. Both deliverables are produced by a reusable pipeline that can be rerun on new time slices of GitHub activity.
 
-**Primary objective.** Deliver a curated dataset of software engineering workflow traces. Each trace contains a linked issue, pre-merge discussion, pull request metadata, review activity, and the full code diff.
+#### 1.1.2 Business Objectives
 
-**Secondary objectives.**
-- Build a reusable pipeline that can be rerun on new GH Archive slices.
-- Train a baseline ML model on a realistic downstream task to validate the dataset.
-- Produce documentation artifacts for external use (dataset card, schema, examples, deployment guide).
+The **primary** business objective of the project is to deliver a curated dataset of software engineering workflow traces, in which each example couples a linked issue, pre-merge discussion, pull request metadata, review activity, and the full code diff into a single structured record. The dataset must be usable by an external ML team without additional cleaning, and it must be accompanied by the documentation a commercial data product is expected to carry.
 
-**Key question.** Can public GitHub activity, filtered and restructured, produce a dataset whose structure and quality are sufficient for commercial use by AI companies building code-related ML systems?
+The **secondary** business objectives are:
 
-### 1.3 Business Success Criteria
+- to build a reusable pipeline that can extend the dataset to new time slices of GitHub activity;
+- to train a baseline model on a realistic downstream task as evidence that the dataset carries predictive signal;
+- to produce the commercial and technical documentation artifacts that let an external team adopt the dataset with minimal friction.
+
+The underlying business question is whether public GitHub activity, once filtered and restructured into workflow traces, yields a dataset of sufficient structure and quality to be used commercially by AI companies building code-related ML systems.
+
+#### 1.1.3 Business Success Criteria
+
+The project will be considered successful if all of the following criteria are met together.
 
 | # | Criterion | Verifiable via |
 |---|---|---|
-| 1 | **Product completeness** — dataset covers 3+ mainstream programming languages including Python | Dataset card language distribution |
-| 2 | **Downstream applicability** — dataset supports at least one realistic downstream task; baseline model beats random | Evaluation scorecard |
-| 3 | **Usability** — dataset loads in standard Python environment without extra cleaning scripts | Deployment guide |
-| 4 | **Commercial readiness** — short product description with value proposition, customer segments, example use cases | Product one-pager |
-| 5 | **Delivery within budget** — executed on existing local hardware, zero external paid services | Repository state |
+| 1 | Dataset covers at least three mainstream programming languages, including Python | Language distribution in the dataset card |
+| 2 | Dataset supports at least one realistic downstream task, evidenced by a baseline model that strictly outperforms a random baseline on held-out data | Evaluation scorecard |
+| 3 | Dataset loads in a standard Python environment using `pandas` or `pyarrow` without additional cleaning scripts | Deployment guide |
+| 4 | A short product description articulates the value proposition, customer segments, and two or three example use cases | Product one-pager |
+| 5 | The project is executed on the team's existing local hardware with no external paid services | Repository state |
 
-### 1.4 Users and Use Cases
+### 1.2 Assess Situation
 
-**Target user group 1.** ML researchers and engineers at AI companies building coding assistants, code review automation, or developer agents. They use the dataset to fine-tune or evaluate LLMs on workflow-context tasks (e.g., generating review comments, predicting review concerns, producing patches from issues).
+#### 1.2.1 Inventory of Resources
 
-**Target user group 2.** Engineering teams inside software companies, who use the dataset to train models assisting their own code review process. Primary use case: predicting, at PR opening time, whether the PR is likely to receive substantive concerns — so reviewer attention can be prioritized.
+Two categories of data support the project. The first is the **GH Archive** public dataset, accessed primarily through BigQuery and, as a fallback, through direct download of the hourly `.json.gz` dumps. GH Archive provides hourly snapshots of GitHub public events going back to 2011 and serves as the source for candidate pull request discovery. The second is the **GitHub REST API**, which is used to enrich each candidate with full pull request metadata, files, reviews, comments, linked issues, and the full unified diff. API access is authenticated with a personal access token stored in the `GITHUB_TOKEN` environment variable.
 
-### 1.5 ML Objectives
+The software resources consist of the project codebase, a standard Python 3.10 environment with the dependencies listed in `requirements.txt`, and a YAML configuration file that centralizes every pipeline parameter. Hardware resources are limited to the team's local development machines; the project explicitly avoids paid compute and paid data services.
 
-The ML task is a binary classification task called **`review_concern`**.
+#### 1.2.2 Requirements, Assumptions, and Constraints
 
-> Given a pull request at the moment of opening, predict whether reviewers will raise substantive concerns.
+Key assumptions underpinning the project are the following:
 
-**Label definition.**
-- **Label = 1** if the PR received at least one formal review with state `CHANGES_REQUESTED`, **or** at least two meaningful review comments.
-- **Label = 0** if the PR received review activity (at least one review or review comment) but no concerns meeting the above threshold.
-- **Excluded** from the modeling set: PRs with no review activity at all.
+- public GitHub activity is sufficiently representative of real engineering workflows to train models whose behavior transfers to private codebases;
+- rule-based filtering is sufficient to reach usable quality without full manual labeling (verified during evaluation through an audit sample);
+- the `review_concern` label, defined in section 1.3, captures a real and useful signal about the quality of a pull request at the moment it is opened;
+- splitting data by repository is sufficient to prevent train/test leakage for the scope of this project; time-based splitting is deferred to a future version.
 
-**Feature constraint.** Only **PR-intrinsic features** are used for training (no leakage from review activity). Full partitioning is in [Section 4.2](#42-feature-partitioning).
+Constraints apply primarily to data access and compute. The GitHub REST API imposes a rate limit of approximately five thousand requests per hour per token, which sets an upper bound on enrichment throughput. The project operates on public repositories only. Local disk and memory are sufficient for dataset sizes in the low tens of thousands of traces but would require revisiting for significantly larger runs.
 
-**Split strategy.** Train/val/test split is done by **repository**, not by PR. All PRs from the same repo fall into the same split.
+#### 1.2.3 Risks and Contingencies
 
-**Model progression.**
-1. Logistic regression on hand-crafted features (sanity baseline)
-2. XGBoost on the full no-leak feature set (main tabular baseline)
-3. Model using ModernBERT embeddings of PR title, body, and linked issue text
+Several risks affect delivery.
 
-**Evaluation metrics.**
-- **Primary:** ROC-AUC and F1 on held-out test set
-- **Secondary:** precision-recall curve, confusion matrix, feature importance, calibration
-- **Minimum bar:** strictly better than a random baseline on both primary metrics
+- **Data quality.** GH Archive events are noisy; bots produce a large fraction of surface-level activity; trivial or generated changes are common; and not every repository exposes a clean issue-to-pull-request-to-review-to-merge chain. The pipeline mitigates this risk through multi-stage filtering, including bot heuristics, size thresholds, linked-issue requirements, and file-level filters on generated and vendored content. A residual-noise check is performed on an audit sample during evaluation.
+- **Label imbalance.** The `review_concern` positive class may be rare in a workflow-filtered dataset; if the class balance proves too skewed, the label definition will be revised before modeling.
+- **Insufficient candidate volume.** The chosen time windows may yield too few candidates; the pipeline is designed to extend easily to additional time windows if needed.
+- **API quota exhaustion.** GitHub rate limits may be hit during large enrichment runs; the client handles this through retry with backoff and explicit rate-limit-aware sleeps.
 
-### 1.6 Data Mining Success Criteria
+#### 1.2.4 Terminology
 
-| # | Criterion | Target Value |
-|---|---|---|
-| 1 | Dataset scale | ≥ 5000 accepted traces (target ~10000) |
-| 2 | Unique repositories | ≥ 500 |
-| 3 | Language coverage | ≥ 3 from the 14 source extensions |
-| 4 | Trace completeness | ≥ 95% with issue + merged PR + review + non-empty diff |
-| 5 | Bot pollution | 0% bot-authored in accepted |
-| 6 | Residual noise in audit | < 10% trivial/docs-only in 100-trace audit sample |
-| 7 | Schema completeness | 100% populate all 7 top-level blocks |
-| 8 | Baseline ROC-AUC | > 0.5 + epsilon on test set |
-| 9 | Baseline F1 | > majority-class F1 on test set |
-| 10 | Load time | Parquet → pandas in < 2 minutes |
+A full glossary of project-specific terms, phrased in plain language, is provided in section 7. Readers unfamiliar with GitHub workflow terminology, with the internal vocabulary of the pipeline, or with the modeling task should consult that section before continuing.
 
-### 1.7 Scope and Non-Goals
+#### 1.2.5 Costs and Benefits
 
-**In scope.**
-- Extraction and curation of workflow traces for **merged** pull requests from public GitHub repositories
-- Multi-language coverage across 14 source-code extensions
-- Baseline ML model for `review_concern` with three progressive variants
-- Standard data product documentation
+The direct cost of the project consists of the team's time and the negligible bandwidth cost of downloading GH Archive dumps and calling the GitHub REST API on a free personal token. No paid services, no cloud compute, and no commercial data sources are used. The expected benefit is a curated dataset and a working pipeline that together serve as the foundation for a future commercial offering, together with the experience of building an end-to-end CRISP-DM data product.
 
-**Out of scope.**
-- **Unmerged pull requests** — not included. Merge outcome prediction is therefore NOT a task this dataset supports (this differs from the earlier BU document, which listed it as an example).
-- **Private repositories** — not accessed.
-- **LLM fine-tuning on SFT files** — SFT files are produced as a secondary deliverable, but the project's own ML evaluation uses the tabular `review_concern` task.
-- **Language detection** beyond file extension matching.
-- **Production-grade deployment** (inference API, monitoring) — out of scope. The deployment artifact is a documented, reproducible dataset and reference model.
+### 1.3 Determine Data Mining Goals
 
-### 1.8 Assumptions
+#### 1.3.1 Data Mining Goals
 
-1. Public GitHub activity is representative enough of real engineering workflows.
-2. Rule-based filtering is sufficient to reach usable quality without full manual labeling.
-3. The `review_concern` label captures a real and useful signal about PR quality.
-4. Repository-level splitting is sufficient to prevent train/test leakage (time-based splitting deferred to a future version).
+Translated into data mining terms, the business objectives above correspond to two concrete goals.
 
-### 1.9 Risks and Contingencies
+**Goal 1 — corpus construction.** Construct a curated corpus of at least five thousand workflow traces, with a target of approximately ten thousand, drawn from a minimum of five hundred distinct public repositories and covering at least three of the fourteen source-code file extensions the pipeline recognizes. Each trace must conform to a fixed schema consisting of seven top-level blocks — linked issue, discussion, pull request metadata, review activity, code diff, quality metadata, and provenance — and must be delivered both in a working JSONL form and in a Parquet release form.
 
-| Risk | Mitigation |
-|---|---|
-| **Data quality** — GH Archive events are noisy (bots, trivial changes, generated files) | Multi-stage filtering with bot heuristics, size thresholds, linked-issue checks, file-level filters |
-| **Event linking** — not every repo exposes a clean issue→PR→review→merge chain | Prioritize traces with explicit linked issues and documented review signals |
-| **API & compute limits** — GitHub API ≈ 5000 req/hour/token | Conservative concurrency, resumable JSONL checkpoints |
-| **Label imbalance** — `review_concern` positives may be too rare | Measure after first pipeline run; revise label if needed |
-| **Insufficient candidates** in chosen time window | Widen window; measurable after next run |
+**Goal 2 — supervised classifier.** Construct a supervised binary classifier for a task named `review_concern`. Given a pull request at the moment it is opened, the classifier predicts whether reviewers will raise substantive concerns during review.
+
+The label is defined as follows:
+
+- **positive (1):** the pull request received at least one formal review with state `CHANGES_REQUESTED`, or at least two meaningful review comments;
+- **negative (0):** the pull request received review activity but no concerns meeting the positive threshold;
+- **excluded:** pull requests with no review activity at all.
+
+A strict separation is maintained between features available at prediction time, which are intrinsic to the pull request, and features derived from review activity, which are available only after the fact and are excluded from the training feature set.
+
+Three modeling variants are planned in order of increasing complexity:
+
+1. **Logistic regression** on a small hand-crafted feature subset, as a sanity baseline;
+2. **XGBoost** on the full tabular feature set, as the main baseline;
+3. **XGBoost with ModernBERT embeddings** of pull request title, body, and linked issue text, to test whether natural-language signal contributes additional predictive power.
+
+Data is split at the repository level, so that all pull requests from a given repository fall into the same split.
+
+#### 1.3.2 Data Mining Success Criteria
+
+On the **data** side, success is defined by four quantitative targets:
+
+- the final dataset contains at least five thousand accepted traces and targets approximately ten thousand;
+- it spans at least five hundred unique repositories and at least three source-code languages;
+- trace completeness — the proportion of accepted traces that contain a linked issue, a merged pull request, at least one review, and a non-empty diff — is at least ninety-five percent;
+- a manual audit of one hundred accepted traces finds trivial, documentation-only, or otherwise unsuitable traces at a rate below ten percent.
+
+On the **modeling** side, success is defined by two quantitative targets on the held-out test set:
+
+- ROC-AUC strictly greater than a random baseline;
+- F1 score strictly greater than a majority-class baseline.
+
+These thresholds are deliberately modest, because the purpose of the modeling exercise in this project is to demonstrate that the dataset carries learnable signal, not to produce a state-of-the-art model.
+
+### 1.4 Produce Project Plan
+
+#### 1.4.1 Project Plan
+
+The project is organized into the six CRISP-DM phases and is expected to iterate between them as typical for the methodology.
+
+- **Business understanding** is stabilized in the current document.
+- **Data understanding** is performed through exploratory analysis of the candidate pool and of the enriched traces, with the output consolidated in a dedicated notebook.
+- **Data preparation** is encapsulated in the pipeline under the `pipeline/` package and is already implemented end to end; remaining preparation work concerns the implementation of the `review_concern` label and the partitioning of the feature table into PR-intrinsic and review-derived groups.
+- **Modeling** proceeds through the three planned variants in sequence.
+- **Evaluation** is consolidated in an evaluation scorecard that checks each data and modeling success criterion against its target.
+- **Deployment** delivers the final dataset, the reference model, and the accompanying documentation.
+
+The project consumes a single data pipeline run on a larger time window than the MVP, producing the `dataset_v1.0` release, followed by modeling and evaluation work on that release. Iteration between phases is expected: in particular, the data preparation phase will be revisited once the `review_concern` label distribution is measured, and the feature table will be revisited once the first modeling results are available.
+
+#### 1.4.2 Initial Assessment of Tools and Techniques
+
+The pipeline is implemented in Python with a small, conventional stack: `requests` for HTTP, `pandas` and `pyarrow` for tabular handling and Parquet, and standard library tooling elsewhere. Modeling uses `scikit-learn` for logistic regression, `xgboost` for gradient-boosted trees, and the `transformers` library for ModernBERT embeddings. Evaluation uses `scikit-learn` metrics. This toolset is deliberately mainstream, because one of the business success criteria is that the dataset be consumable in a standard Python environment.
+
+### 1.5 Users and Use Cases
+
+Two user groups are targeted explicitly.
+
+- **ML researchers and engineers at AI companies** building coding assistants, code review automation, or autonomous developer agents. They use the dataset to fine-tune or evaluate language models on workflow-context tasks such as generating review comments, predicting review concerns, or producing patches from issues.
+- **Engineering teams inside software companies** who train internal models to assist their own code review process. Their primary use case is predicting, at pull request opening time, whether the pull request is likely to attract substantive review concerns, so that reviewer attention can be prioritized accordingly.
+
+### 1.6 Scope and Non-Goals
+
+**In scope:** the extraction and curation of workflow traces for merged pull requests from public GitHub repositories; multi-language coverage across a fixed list of fourteen source-code extensions; the `review_concern` downstream task with its three modeling variants; and the standard set of commercial data product documentation artifacts.
+
+**Out of scope:**
+
+- **unmerged pull requests** are not included, and as a consequence merge outcome prediction is not a task this dataset supports;
+- **private repositories** are not accessed;
+- **large-scale supervised fine-tuning** of a language model on the SFT files produced by the pipeline is not part of the project; the SFT files are delivered as a secondary artifact, and the project's own ML evaluation uses the tabular `review_concern` task;
+- **language detection** is not attempted beyond file-extension matching;
+- **production-grade deployment** in the form of an inference service with monitoring is not part of the project; the deployment artifact is a documented, reproducible dataset together with a reference model.
 
 ---
 
 ## 2. Data Understanding
 
-### 2.1 Data Sources
+### 2.1 Collect Initial Data
 
-Two sources used in sequence:
+Data collection proceeds in two stages that correspond to the two data sources identified in the previous phase.
 
-**Source 1 — GH Archive (candidate discovery).**
-Public dataset `githubarchive.day.YYYYMMDD`. Contains hourly dumps of GitHub public events since 2011. Two access paths:
-- **BigQuery** via `sql/01_candidate_prs.sql` (primary path)
-- **Local hourly `.json.gz` dumps** via `pipeline/gharchive.py` (fallback)
+**Stage 1 — candidate discovery.** The pipeline queries GH Archive, either through the BigQuery SQL file `sql/01_candidate_prs.sql` or, as a fallback, through the local hourly dumps downloaded by `pipeline/gharchive.py`. The result is a candidate table in CSV form, in which each row corresponds to one merged pull request together with the counts of events it produced. The current `dataset_mvp_v0.1` release was built from GH Archive data for March 2025 and yielded approximately seventy-five hundred enriched pull requests. Data collection for the final `dataset_v1.0` release targets approximately ten thousand traces drawn from the first weeks of several months of 2026 and is currently in progress.
 
-**Source 2 — GitHub REST API (enrichment).**
-`https://api.github.com`. Called per candidate to fetch full PR details, files, reviews, comments, linked issue, and the unified diff. Requires personal access token (env var `GITHUB_TOKEN`).
+**Stage 2 — enrichment.** The pipeline enriches each candidate by issuing eight GitHub REST API calls that retrieve the full pull request object, the file list with per-file patches, the formal reviews, the inline review comments, the pull request conversation comments, the linked issue with its comments where a linked issue can be detected, and the complete unified diff. A linked issue is detected by a regular expression over the pull request body that matches the closing keywords `fix`, `fixes`, `close`, `closes`, `resolve`, and `resolves` followed by a hash and an issue number. Cross-repository issue references are not followed; pull requests whose only linked issue lives in a different repository are treated as having no linked issue and are ultimately rejected by the linked-issue filter.
 
-### 2.2 Pipeline Data Flow
+The output is an append-only JSONL file at `data/raw/enriched_prs_raw.jsonl`, complemented by a failures file at `data/raw/enriched_prs_failed.jsonl` that records pull requests for which enrichment could not be completed. The initial data collection report for the final release will be produced together with the data understanding notebook, once `dataset_v1.0` data collection concludes.
 
-```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   GH Archive     │────▶│   Candidates     │────▶│    GitHub API    │
-│   (BigQuery)     │     │   CSV            │     │   Enrichment     │
-└──────────────────┘     └──────────────────┘     └──────────────────┘
-                                                            │
-                                                            ▼
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Parquet        │◀────│   Accepted /     │◀────│   Raw JSONL      │
-│   + Features     │     │   Rejected JSONL │     │   (enriched)     │
-│   + SFT          │     │                  │     │                  │
-└──────────────────┘     └──────────────────┘     └──────────────────┘
-                                │
-                                ▼
-                         ┌──────────────────┐
-                         │  Train/Val/Test  │
-                         │  (repo-level)    │
-                         └──────────────────┘
-```
+### 2.2 Describe Data
 
-### 2.3 Candidate Stage
+At the surface level the data has the following properties.
 
-Runs on GH Archive events over a fixed window. Aggregates events per PR. One candidate row = one merged PR with basic counts.
+The **candidate table** contains identifiers and event counts for merged pull requests, including the repository name, the pull request number, the pull request URL, title, body, merge commit SHA, the counts of additions, deletions, and changed files, and the counts of issue comment, review, and review comment events observed in the window.
 
-**SQL-level filters already applied:**
-- PR is merged (`PullRequestEvent`, `action=closed`, `merged=true`)
-- `changed_files` within [min, max]
-- `additions + deletions` within [min, max]
-- At least one review event or one review comment event
-- Author login does not match bot patterns
+The **enriched JSONL** contains one object per pull request, whose structure mirrors the seven-block trace schema documented in section 9.
 
-**Candidate row fields:**
-`repo_name`, `pr_number`, `pr_url`, `pr_title`, `pr_body`, `merge_commit_sha`, `additions`, `deletions`, `changed_files`, `issue_comment_events`, `review_events`, `review_comment_events`, timestamps.
+At the **processed layer** the data is split into accepted and rejected traces; the accepted traces are further split by repository into train, validation, and test partitions in an eighty-ten-ten ratio with seed forty-two; and flat feature tables are exported for each split in both CSV and Parquet form.
 
-> **Note:** Local GH Archive path produces a slightly different column set than the BigQuery SQL. Current dataset uses BigQuery only; both paths converge at the enrichment step.
+The MVP release produced approximately seventy-five hundred enriched pull requests, whose full description report is pending the final data collection. The description report will populate the counts of candidates, enriched traces, failed enrichments with failure breakdown, accepted and rejected traces, the distribution of reject reasons, language distribution in the accepted set, the number of unique repositories and the top twenty repositories by trace count, the distribution of diff sizes, the distribution of review activity, the rate of linked-issue presence, and the label distribution of `review_concern` once implemented.
 
-### 2.4 Enrichment Stage
+### 2.3 Explore Data
 
-For each candidate, 8 GitHub API calls:
+Data exploration is performed in the notebook `notebooks/01_data_understanding.ipynb`, which is planned but not yet authored. The exploration is expected to address three families of questions.
 
-| # | Endpoint | Purpose |
-|---|---|---|
-| 1 | `GET /repos/{o}/{r}/pulls/{n}` | Full PR object |
-| 2 | `GET /repos/{o}/{r}/pulls/{n}/files` | File list with patches |
-| 3 | `GET /repos/{o}/{r}/pulls/{n}/reviews` | Formal reviews |
-| 4 | `GET /repos/{o}/{r}/pulls/{n}/comments` | Inline review comments |
-| 5 | `GET /repos/{o}/{r}/issues/{n}/comments` | PR thread comments |
-| 6 | `GET /repos/{o}/{r}/issues/{issue_n}` | Linked issue (if detected) |
-| 7 | `GET /repos/{o}/{r}/issues/{issue_n}/comments` | Issue comments |
-| 8 | `GET /repos/{o}/{r}/pulls/{n}` (diff media type) | Full unified diff |
+- **Distributions.** The shapes of the changed-files, additions, deletions, and diff-lines distributions in the accepted set, together with the distribution of review comment counts and of discussion counts.
+- **Relations between attributes.** The association between pull request size and review activity, between author association and review outcomes, and between the presence of a linked issue and the downstream label.
+- **Sub-populations.** Whether language or repository concentration affects the label distribution in ways that could bias modeling.
 
-Linked issue detected by regex over PR body: `(fix|fixes|close|closes|resolve|resolves) #<N>`.
+The consolidated output will be the data exploration report, delivered as the rendered notebook together with a short narrative summary.
 
-**Measured throughput:** ~2.4 seconds per PR end-to-end (single token, includes retries and rate-limit waits). 7500 PRs took ~18000 seconds.
+### 2.4 Verify Data Quality
 
-**Failure modes:** deleted repo, private repo, cross-repo issue reference (not followed), API 5xx after retries. Failures → `data/raw/enriched_prs_failed.jsonl`.
+Data quality is verified along three axes.
 
-### 2.5 Data Exploration
+- **Completeness** is measured as the proportion of accepted traces in which all seven schema blocks are populated, including in particular a non-null linked issue, at least one review, and a non-empty full diff. The target is at least ninety-five percent.
+- **Correctness** is spot-checked through a hundred-trace audit sample that combines accepted traces, rejected traces, and borderline traces with scores between sixty and eighty, generated by the `audit` pipeline command into `data/audit/audit_sample.csv` and reviewed manually.
+- **Consistency** is enforced by the schema assembly step in `pipeline/schema.py`, which applies a fixed structure to every trace.
 
-> **Status:** Initial MVP run on March 2025 data produced ~7500 enriched PRs. Full distribution report pending next pipeline run.
+Known quality caveats have been recorded:
 
-**Fields to populate after next run:**
-- Candidate count (BigQuery output)
-- Enriched count, failure count, failure breakdown
-- Accepted count, rejected count
-- Reject reasons breakdown
-- Language distribution in accepted set
-- Repository count; top-20 repos by trace count
-- Diff-size distribution
-- Review-activity distribution
-- Linked-issue presence rate
-- `review_concern` label distribution (once implemented)
+- the `finalize` command has minor edge-case inconsistencies relative to running the individual stages in sequence; this does not affect data correctness when stages are run individually;
+- the linked-issue regex does not follow cross-repository references, a deliberate trade-off that slightly reduces coverage and has no impact on the quality of the accepted traces;
+- the `author_association` field is occasionally null for deleted users;
+- the full-diff endpoint can truncate very large diffs, but such pull requests are in any case rejected by the diff-size filter.
 
-### 2.6 Data Quality Observations
-
-Known observations:
-- `finalize` CLI command has minor edge-case inconsistencies (tracked in [Section 14](#14-task-checklist)).
-- Linked-issue regex does not follow cross-repo references; such PRs are treated as having no linked issue and rejected.
-- `author_association` is occasionally null for deleted users.
-- Full-diff endpoint may truncate very large diffs; such PRs are rejected anyway by size filter.
-
-### 2.7 Feasibility Statement
-
-**Verdict: feasible at target scope (~10000 traces).**
-
-- Pipeline throughput: ~2.4s per PR
-- Target run: ~10000 traces = ~7 hours (single overnight run)
-- Failure rate: observed low
-- Assumes GitHub token rate limits hold
+The consolidated data quality report will be produced together with the evaluation scorecard in section 5.
 
 ---
 
 ## 3. Data Preparation
 
-### 3.1 Overview
+### 3.1 Select Data
 
-Data preparation turns raw candidate events into the final structured dataset. Owned by the pipeline under `pipeline/`. Covers: enrichment, filtering, scoring, schema assembly, split, feature export, Parquet export, SFT export.
+Data selection operates on rows and columns.
 
-### 3.2 Filtering Rules
+**Rows.** The pipeline retains only merged pull requests from public repositories, with a diff size and file count within configured bounds, authored by non-bot accounts, carrying an explicit linked issue, and exhibiting a minimum level of review and discussion activity. The detailed rules and the rationale for each exclusion are documented at the level of individual reject reasons in section 10, which serves as the formal rationale for inclusion and exclusion.
 
-All filtering implemented in `pipeline/filters.py`, function `evaluate_example`. Each rule violation produces a **reject reason**. See full reference in [Section 10](#10-reject-reasons-reference).
+**Columns.** The pipeline keeps the full schema for accepted traces, because downstream consumers are expected to use different subsets for different tasks. However, it restricts the training feature table for the `review_concern` task to pull-request-intrinsic features in order to avoid label leakage; the partitioning is described in section 4.
 
-**Hard filters applied per trace:**
+### 3.2 Clean Data
 
-| Category | Rule |
-|---|---|
-| **Merge status** | PR must be merged |
-| **Linked issue** | PR body must contain explicit closing keyword + issue number |
-| **Author** | Not a known bot login |
-| **Size** | `changed_files ∈ [2, 30]`, `diff_lines ∈ [50, 2000]` |
-| **File types** | Not docs-only, not lockfile-only, not generated-only |
-| **Source files** | Must contain at least one source file and one source patch |
-| **Review activity** | ≥ 2 review comments, ≥ 2 meaningful review comments |
-| **Discussion** | ≥ 2 total comments (PR + issue) |
-| **Full diff** | Must be available if `store_full_diff` is true |
+Cleaning happens primarily through filtering rather than through imputation, because the dataset is assembled from structured GitHub API responses whose fields are either present or meaningfully absent.
 
-### 3.3 Quality Scoring
+Traces that fail any hard filter are moved to the rejected pool with the corresponding reject reasons attached, rather than being silently dropped, so that the rejected pool remains available for error analysis. Traces that pass the hard filters are scored by a weighted sum of positive signals minus penalties, documented in the operational content of this document. Trivial review comments are filtered out by a small heuristic that requires a comment to exceed thirty characters after trimming and lower-casing and to not match a short list of trivial phrases; comments that fail this filter do not count toward the meaningful review comment thresholds.
 
-An integer score computed from positive signals minus penalties. **Acceptance threshold = 70.**
+The cleaning report for the final release will be produced as part of the quality report generated by the `report` pipeline command.
 
-**Positive signals (additive):**
+### 3.3 Construct Data
 
-| Signal | Points |
-|---|---|
-| PR merged | +20 |
-| Has linked issue | +20 |
-| Meets meaningful review comment threshold | +20 |
-| Meets discussion threshold | +10 |
-| Has source files | +10 |
-| Has source patches | +10 |
-| Diff size within range | +10 |
-| Any review has `CHANGES_REQUESTED` | +10 |
-| Else any review has `COMMENTED` | +5 |
+Data construction produces derived attributes and no entirely new records. Per-trace derived attributes include the following:
 
-**Penalties (subtractive, −20 each):**
-- `bot_author`, `docs_only`, `lockfile_only`, `generated_or_vendor_only`
+- the diff-line count, computed as the sum of additions and deletions;
+- the source-file count and source-patch count, computed from the file list filtered by extension;
+- the source-file ratio, computed as the share of changed files whose extension is recognized as source code;
+- the meaningful-review-comment count, computed by applying the trivial-comment filter;
+- the discussion count, computed as the sum of pull request conversation comments and linked-issue comments;
+- the has-linked-issue indicator;
+- the has-changes-requested indicator;
+- the counts of reviews by state;
+- the top language of the trace, inferred from its source files;
+- the quality score.
 
-**Acceptance rule:** `accepted = (len(reject_reasons) == 0) AND (score >= 70)`.
+The `review_concern` label is itself a constructed attribute; its implementation is pending and is tracked in section 14.
 
-### 3.4 Schema Assembly
+### 3.4 Integrate Data
 
-Schema building lives in `pipeline/schema.py`. Produces one nested JSON object per enriched PR. Full field reference in [Section 9](#9-data-schema-reference).
+Integration combines, for each pull request, the fields extracted from the eight GitHub API responses into a single structured trace. The operation is a join across endpoints on the pair of repository name and pull request number, with a secondary join onto the linked issue when present. The output is the nested JSON object whose schema is documented in section 9.
 
-**Seven top-level blocks:**
-1. `issue` — linked issue data
-2. `discussion` — PR-thread comments
-3. `pr` — PR metadata
-4. `review` — formal reviews + inline comments
-5. `code_diff` — files with patches + full unified diff
-6. `quality` — pipeline decision (accepted, score, reject reasons)
-7. `provenance` — source, timestamps, API errors
+### 3.5 Format Data
 
-### 3.5 Train/Validation/Test Split
+The final dataset is delivered in two formats:
 
-Implemented in `pipeline/split.py`. **Repository-level stratification:** all PRs from the same repo fall into the same split.
+- **JSONL** is the working format, with one trace per line, convenient for streaming processing and for inspection with standard command-line tools;
+- **Parquet** is the release format, providing efficient columnar storage, good compression, and fast loading into `pandas` or `pyarrow`.
 
-| Split | Ratio |
-|---|---|
-| Train | 0.8 |
-| Val | 0.1 |
-| Test | 0.1 |
-
-Seed: 42 (reproducible).
-
-### 3.6 Feature Export
-
-Implemented in `pipeline/features.py`. Produces flat CSV and Parquet feature tables for each split.
-
-> **Known gap:** The current feature table mixes PR-intrinsic features with review-derived features. For `review_concern` modeling this must be partitioned into two groups (see [Section 4.2](#42-feature-partitioning)). **Partitioning is not yet implemented.**
-
-**Current feature columns** (see `FEATURE_COLUMNS` in `pipeline/features.py`):
-`example_id`, `repo`, `pr_number`, `accepted`, `score`, `changed_files`, `additions`, `deletions`, `diff_lines`, `num_reviews`, `num_review_comments`, `num_meaningful_review_comments`, `discussion_count`, `has_linked_issue`, `pr_body_length`, `issue_body_length`, `source_file_count`, `source_patch_count`, `source_file_ratio`, `has_changes_requested`, `review_states_count_approved`, `review_states_count_commented`, `review_states_count_changes_requested`, `top_language`, `author_association`.
-
-### 3.7 Output Artifacts
-
-| Artifact | Path | Format |
-|---|---|---|
-| Enriched raw | `data/raw/enriched_prs_raw.jsonl` | JSONL |
-| Failed enrichments | `data/raw/enriched_prs_failed.jsonl` | JSONL |
-| Accepted traces | `data/processed/dataset_mvp_v0.1.accepted.jsonl` | JSONL |
-| Rejected traces | `data/processed/dataset_mvp_v0.1.rejected.jsonl` | JSONL |
-| Accepted traces (release) | `data/processed/dataset_mvp_v0.1.accepted.parquet` | Parquet |
-| Rejected traces | `data/processed/dataset_mvp_v0.1.rejected.parquet` | Parquet |
-| Train split | `data/processed/dataset_mvp_v0.1.train.jsonl` | JSONL |
-| Val split | `data/processed/dataset_mvp_v0.1.val.jsonl` | JSONL |
-| Test split | `data/processed/dataset_mvp_v0.1.test.jsonl` | JSONL |
-| Feature tables | `data/processed/dataset_mvp_v0.1.{split}.features.{csv,parquet}` | CSV + Parquet |
-| Review SFT | `data/processed/dataset_mvp_v0.1.review_sft.jsonl` | JSONL |
-| Issue→Patch SFT | `data/processed/dataset_mvp_v0.1.issue_to_patch_sft.jsonl` | JSONL |
-| Audit sample | `data/audit/audit_sample.csv` | CSV |
-| Quality report | `reports/quality_report_v0.1.md` | Markdown |
-| Dataset card | `data/processed/DATASET_CARD.md` | Markdown |
+Feature tables are delivered in both CSV and Parquet forms — CSV for human inspection and Parquet for modeling. Auxiliary files for supervised fine-tuning of language models, produced by the `sft` pipeline command, follow a chat-style message format with explicit roles and associated metadata and are delivered as JSONL.
 
 ---
 
 ## 4. Modeling
 
-### 4.1 Modeling Task
+### 4.1 Select Modeling Technique
 
-**Task:** Binary classification — `review_concern`
-**Target:** Does a PR, at opening time, attract substantive review concerns?
+Three modeling techniques are planned in order of increasing complexity.
 
-**Label formula (to be implemented):**
+1. **Logistic regression** on a small hand-crafted subset of the pull-request-intrinsic features, as a sanity baseline. The purpose of this model is to confirm that a simple linear combination of obvious signals already beats a random baseline.
+2. **XGBoost** on the full pull-request-intrinsic feature set, as the main tabular baseline. XGBoost is chosen for its strong performance on heterogeneous tabular features, its tolerance of missing values, and the interpretability of its feature importance output.
+3. **XGBoost with ModernBERT embeddings** of the pull request title, pull request body, and linked issue body, as an advanced variant. The purpose of this variant is to assess whether natural-language content contributes predictive power beyond the tabular features.
 
-```
-review_concern = 1 if (
-    any(review.state == "CHANGES_REQUESTED") OR
-    count(meaningful_review_comments) >= 2
-)
-review_concern = 0 if (
-    (count(reviews) >= 1 OR count(review_comments) >= 1) AND
-    review_concern != 1
-)
-EXCLUDED if no review activity at all
-```
+The modeling assumptions are that the repository-level split prevents train/test leakage at a level sufficient for the scope of this project, and that the class balance of `review_concern` on the modeling set will be sufficient to train without specialized imbalance-handling techniques. Both assumptions will be verified empirically before modeling.
 
-This label is **distinct from `quality.accepted`**, which is a curation label and cannot be used as the modeling target (it would leak the same features used to predict it).
+### 4.2 Generate Test Design
 
-### 4.2 Feature Partitioning
+The test design separates the accepted data into training, validation, and test partitions at the repository level, in an **eighty-ten-ten ratio**, with **seed forty-two**, so that all pull requests from a given repository fall into the same partition. Repository-level splitting is chosen over pull-request-level splitting because pull requests from the same repository share authors, conventions, and review culture, and pull-request-level splitting would allow the model to exploit those shared characteristics rather than generalizable signal. The pull requests used for modeling are restricted to those that received review activity at all, in line with the label definition in section 1.3.1.
 
-**Critical rule:** No review-derived features in training features for `review_concern`.
+Model selection is performed on the validation set; the test set is used exactly once per model, at the end, to produce the numbers that appear in the evaluation scorecard.
 
-| Group | Available at prediction time? | Used in training? |
-|---|---|---|
-| **PR-intrinsic** (no-leak) | Yes — at PR opening | **Yes** |
-| **Review-derived** (leak) | No — only after review | **No** (analysis only) |
+The metrics are organized as follows:
 
-**PR-intrinsic features (use for training):**
-- `changed_files`, `additions`, `deletions`, `diff_lines`
-- `has_linked_issue`, `issue_body_length`
-- `pr_body_length`
-- `source_file_count`, `source_patch_count`, `source_file_ratio`
-- `top_language`, `author_association`
-- Text features from PR title, PR body, linked issue body (for ModernBERT variant)
+- **Primary metrics:** ROC-AUC and F1.
+- **Secondary outputs:** the precision-recall curve, the confusion matrix, the feature importance for tree models, and a calibration plot.
 
-**Review-derived features (exclude from training):**
-- `num_reviews`, `num_review_comments`, `num_meaningful_review_comments`
-- `discussion_count`
-- `has_changes_requested`
-- `review_states_count_*`
-- `score`, `accepted` (these depend on review signals)
+### 4.3 Build Model
 
-### 4.3 Model Progression
+Model building is planned in the notebooks `03_modeling_baselines.ipynb`, `04_modeling_xgboost.ipynb`, and `05_modeling_modernbert.ipynb`. Each notebook will record its parameter settings, the fitted model object, and a model description that covers the feature set used, the training configuration, and any preprocessing applied. No models have been trained at the time of writing.
 
-Three models trained in order of increasing complexity:
+### 4.4 Assess Model
 
-| Stage | Model | Features | Purpose |
-|---|---|---|---|
-| 1 | Logistic Regression | Small hand-crafted subset | Sanity baseline |
-| 2 | XGBoost | Full no-leak tabular set | Main tabular baseline |
-| 3 | XGBoost + ModernBERT | Tabular + text embeddings | Test if NL signal helps |
+Model assessment compares each trained model against the data mining success criteria in section 1.3.2 and against the other models in the progression. Models are ranked on the validation set by ROC-AUC and F1, with ties broken by the secondary metrics.
 
-### 4.4 Evaluation Metrics
+The assessment also considers two qualitative dimensions:
 
-**Primary:**
-- ROC-AUC (on held-out test set)
-- F1-score (on held-out test set)
+- **domain-level plausibility:** whether the features that rank highest in the XGBoost feature importance are consistent with what an experienced reviewer would intuitively expect;
+- **error structure:** whether the errors on the test set cluster into interpretable groups.
 
-**Secondary:**
-- Precision-recall curve
-- Confusion matrix
-- Feature importance (tree models)
-- Calibration plot
-
-**Minimum bar:** strictly better than random baseline on both primary metrics.
-
-### 4.5 Modeling Artifacts (Planned)
-
-Notebooks to be created under `notebooks/`:
-- `03_modeling_baselines.ipynb` — logistic regression
-- `04_modeling_xgboost.ipynb` — XGBoost main baseline
-- `05_modeling_modernbert.ipynb` — ModernBERT-enhanced variant
+Revised parameter settings, if any, are recorded alongside the assessment and motivate further iterations.
 
 ---
 
 ## 5. Evaluation
 
-### 5.1 Evaluation Approach
+### 5.1 Evaluate Results
 
-Each success criterion from [Section 1.6](#16-data-mining-success-criteria) is checked explicitly and verifiably using pipeline outputs and modeling notebook results. Evaluation is consolidated in an **evaluation scorecard** — a table with one row per criterion, measured value, target, and verdict.
+Evaluation assesses both the dataset and the model against the business and data mining success criteria defined in section 1.
 
-### 5.2 Evaluation Scorecard Template
+- **Dataset evaluation** covers scale, repository and language diversity, trace completeness, the degree to which the accepted pool is free of bots and of generated or documentation-only content, and the residual noise rate measured on the audit sample.
+- **Model evaluation** covers ROC-AUC and F1 on the held-out test set, the shape of the precision-recall curve, calibration, and the interpretability of the feature importance.
 
-| # | Criterion | Target | Measured | Verdict |
-|---|---|---|---|---|
-| 1 | Dataset scale | ≥ 5000 accepted | _TBD_ | _TBD_ |
-| 2 | Unique repositories | ≥ 500 | _TBD_ | _TBD_ |
-| 3 | Language coverage | ≥ 3 | _TBD_ | _TBD_ |
-| 4 | Trace completeness | ≥ 95% | _TBD_ | _TBD_ |
-| 5 | Bot pollution | 0% | _TBD_ | _TBD_ |
-| 6 | Residual audit noise | < 10% | _TBD_ | _TBD_ |
-| 7 | Schema completeness | 100% | _TBD_ | _TBD_ |
-| 8 | Baseline ROC-AUC | > random | _TBD_ | _TBD_ |
-| 9 | Baseline F1 | > majority | _TBD_ | _TBD_ |
-| 10 | Parquet load time | < 2 min | _TBD_ | _TBD_ |
+The consolidated output is the **evaluation scorecard**, a table with one row per criterion containing the target value, the measured value, and a pass-or-fail verdict. A criterion that fails is accompanied by an analysis of why it failed and of whether the failure is blocking for the business objectives. In addition, the evaluation identifies any findings that emerged during the project but were not part of the original success criteria, and assesses whether they suggest additional uses of the dataset or limitations worth documenting.
 
-### 5.3 Error Analysis
+### 5.2 Review Process
 
-Planned analyses:
-- **Reject reason breakdown** — frequency of each reason in rejected pool
-- **Audit sample review** — human-judged trivial/docs/weak-review rate in 100 accepted traces
-- **Label imbalance check** — `review_concern` class balance in the modeling set
-- **Feature importance** — top features for XGBoost baseline
-- **Failure mode analysis** — confusion matrix error cases, especially false positives on `review_concern`
+Before deployment, a structured review is performed on the data mining engagement to verify that no important factor or task was overlooked. The review covers the following points:
 
-### 5.4 Business Evaluation
+- the filter rules and their thresholds, checked against the reject reason distribution on the final release;
+- the feature partitioning, checked against the label definition, to confirm that no review-derived feature has leaked into the training feature set;
+- the repository-level split, to confirm that no repository appears in more than one partition;
+- the audit sample, to confirm that the residual noise rate is below the target;
+- the pipeline outputs, to confirm that the dataset card and the quality report are consistent with the underlying data;
+- the reproducibility of the pipeline, by rerunning the final stages on a small subset from a clean checkout.
 
-The Business Unit prepares:
-- Success-criteria scorecard
-- Short product description (one-pager) covering value proposition, customer segments, example use cases
-- Commercial readiness assessment
+The output of this step is a short review-of-process note summarizing what was checked and what, if anything, was corrected as a result.
+
+### 5.3 Determine Next Steps
+
+At the end of evaluation, the project takes one of three paths:
+
+- **proceed to deployment**, if all blocking criteria are met and no defect is uncovered;
+- **initiate a further iteration** of data preparation or modeling, if a blocking criterion fails or if the review of process uncovers a defect that cannot be corrected by documentation alone;
+- **scope a follow-up project**, if evaluation uncovers substantial new opportunities, such as a second downstream task that the dataset supports well.
+
+The output is a short list of possible actions and an explicit decision on which of them the project adopts.
 
 ---
 
 ## 6. Deployment
 
-### 6.1 Deployment Goal
+### 6.1 Plan Deployment
 
-Package the dataset and reference model into a form that can be handed to an external team or customer. **The deployment artifact is data + documentation + reference code, not a running service.**
+The deployment artifact of this project is a **dataset together with its documentation and a reference model**, rather than a running service. Deployment planning therefore focuses on packaging and on making the artifact straightforward to consume.
 
-### 6.2 Deliverables
+The deliverables are the following:
 
-| Artifact | Path / Location | Status |
-|---|---|---|
-| Final accepted dataset (JSONL) | `data/processed/dataset_v1.0.accepted.jsonl` | Planned |
-| Final accepted dataset (Parquet) | `data/processed/dataset_v1.0.accepted.parquet` | Planned |
-| Rejected pool (for error analysis) | `data/processed/dataset_v1.0.rejected.{jsonl,parquet}` | Planned |
-| Train/Val/Test splits | `data/processed/dataset_v1.0.{train,val,test}.{jsonl,features.{csv,parquet}}` | Planned |
-| SFT files | `data/processed/dataset_v1.0.{review_sft,issue_to_patch_sft}.jsonl` | Planned |
-| Schema documentation | This document, [Section 9](#9-data-schema-reference) | Present |
-| Dataset card | `data/processed/DATASET_CARD.md` | Auto-generated |
-| Quality report | `reports/quality_report_v1.0.md` | Auto-generated |
-| Reference model + inference example | `notebooks/` + saved model artifact | Planned |
-| Deployment guide | To be written | Planned |
-| Product one-pager | To be written | Planned |
-| Final report + slides + video | Presentation materials | Planned |
+- the final accepted dataset, in JSONL and Parquet forms;
+- the rejected pool, delivered alongside for error analysis;
+- the train, validation, and test splits, both as trace JSONL and as feature tables in CSV and Parquet;
+- the SFT files, as JSONL;
+- the documentation, consisting of the schema reference in section 9, the auto-generated dataset card, the auto-generated quality report, the evaluation scorecard, the product one-pager, the deployment guide, and this document;
+- the reference model, as a saved model artifact accompanied by a short inference example.
 
-### 6.3 Reproducibility Requirements
+The deployment plan specifies that a consumer with a standard Python environment can load the Parquet release with a single call to `pandas.read_parquet` or `pyarrow.parquet.read_table` and can reproduce the reference model by running the modeling notebooks against the released splits.
 
-- Pipeline must run end-to-end on project hardware with zero paid services
-- All config lives in `config.yaml`
-- Data splits reproducible from seed (42)
-- Dataset card + quality report auto-generated by the pipeline
+### 6.2 Plan Monitoring and Maintenance
+
+Because the project delivers a static dataset rather than a running service, monitoring in the operational sense does not apply. Maintenance is planned in terms of reproducibility and extensibility:
+
+- the pipeline is fully parameterized through `config.yaml`;
+- the splits are reproducible from a fixed seed;
+- the dataset card and the quality report are regenerated by the pipeline rather than edited by hand;
+- the two data collection paths — the BigQuery SQL and the local GH Archive fallback — are both kept functional so that the dataset can be extended to new time windows without re-engineering.
+
+Known issues affecting maintenance, including the minor edge cases in the `finalize` command, are documented in section 13 so that future iterations can address them.
+
+### 6.3 Produce Final Report
+
+The **final report** consolidates the outputs of all six phases into a single narrative document intended for external review. It summarizes the business problem, the data, the pipeline, the modeling results, the evaluation against the success criteria, and the deployment artifact, and refers the reader to this document and to the dataset card for technical detail.
+
+The **final presentation** is a short slide deck that walks through the same material in a form suitable for oral delivery, supported by a video whose scene-by-scene script is recorded in section 15.
+
+### 6.4 Review Project
+
+At project close, the team performs a short retrospective in which it records what went well, what went poorly, what would be done differently, and what experience accumulated during the project should be preserved for future work. The output is the **experience documentation**, kept in the repository alongside the final report.
 
 ---
 
