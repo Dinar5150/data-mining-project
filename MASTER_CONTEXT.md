@@ -134,7 +134,7 @@ Three modeling variants are planned in order of increasing complexity:
 
 1. **Logistic regression** on a small hand-crafted feature subset, as a sanity baseline;
 2. **XGBoost** on the full tabular feature set, as the main baseline;
-3. **XGBoost with ModernBERT embeddings** of pull request title, body, and linked issue text, to test whether natural-language signal contributes additional predictive power.
+3. **XGBoost with ModernBERT embeddings** of three text fields per example: the concatenation of pull request title and body, the linked issue body, and the pull request code diff. Used to test whether natural-language and code signal contributes additional predictive power beyond the tabular features.
 
 Data is split at the repository level, so that all pull requests from a given repository fall into the same split.
 
@@ -305,9 +305,9 @@ Three modeling techniques are planned in order of increasing complexity.
 
 1. **Logistic regression** on a small hand-crafted subset of the pull-request-intrinsic features, as a sanity baseline. The purpose of this model is to confirm that a simple linear combination of obvious signals already beats a random baseline.
 2. **XGBoost** on the full pull-request-intrinsic feature set, as the main tabular baseline. XGBoost is chosen for its strong performance on heterogeneous tabular features, its tolerance of missing values, and the interpretability of its feature importance output.
-3. **XGBoost with ModernBERT embeddings** of the pull request title, pull request body, and linked issue body, as an advanced variant. The purpose of this variant is to assess whether natural-language content contributes predictive power beyond the tabular features.
+3. **XGBoost with ModernBERT embeddings** of three text fields per example, as an advanced variant. The three fields are the concatenation of pull request title and body, the linked issue body, and the pull request code diff. Each field is tokenized independently with right-side truncation to ModernBERT's maximum context of 8192 tokens; the code-diff field is assembled by concatenating file-level patches in their original order up to that limit. Each field produces a 768-dimensional embedding, which is then reduced by PCA to a smaller number of components and concatenated with the tabular feature set before being fed into XGBoost. The target PCA dimensionality is decided empirically on the validation set. The purpose of this variant is to assess whether natural-language and code content contributes predictive power beyond the tabular features.
 
-The modeling assumptions are that the repository-level split prevents train/test leakage at a level sufficient for the scope of this project, and that the class balance of `review_concern` on the modeling set will be sufficient to train without specialized imbalance-handling techniques. Both assumptions will be verified empirically before modeling.
+The modeling assumptions are that the repository-level split prevents train/test leakage at a level sufficient for the scope of this project; that the class balance of `review_concern` on the modeling set will be sufficient to train without specialized imbalance-handling techniques; and that ModernBERT, although pretrained on natural language rather than code, produces code-diff embeddings of sufficient quality to serve as a baseline representation, with the understanding that a dedicated code encoder could be substituted in a future iteration. All three assumptions will be verified empirically before modeling. 
 
 ### 4.2 Generate Test Design
 
@@ -322,8 +322,7 @@ The metrics are organized as follows:
 
 ### 4.3 Build Model
 
-Model building is planned in the notebooks `03_modeling_baselines.ipynb`, `04_modeling_xgboost.ipynb`, and `05_modeling_modernbert.ipynb`. Each notebook will record its parameter settings, the fitted model object, and a model description that covers the feature set used, the training configuration, and any preprocessing applied. No models have been trained at the time of writing.
-
+Model building is planned in the notebooks `03_modeling_baselines.ipynb`, `04_modeling_xgboost.ipynb`, and `05_modeling_modernbert.ipynb`. Each notebook will record its parameter settings, the fitted model object, and a model description that covers the feature set used, the training configuration, and any preprocessing applied. For the ModernBERT-enhanced variant, the model description additionally records the tokenizer configuration, the chosen PCA dimensionality per text field, and the fitted PCA components, so that the feature extraction step is reproducible on new data. No models have been trained at the time of writing. 
 ### 4.4 Assess Model
 
 Model assessment compares each trained model against the data mining success criteria in section 1.3.2 and against the other models in the progression. Models are ranked on the validation set by ROC-AUC and F1, with ties broken by the secondary metrics.
