@@ -29,7 +29,7 @@ class DatasetConfig:
     max_changed_files: int = 30
     min_diff_lines: int = 50
     max_diff_lines: int = 2000
-    require_linked_issue: bool = True
+    require_linked_issue: bool = False
     require_source_patch: bool = True
     store_full_diff: bool = True
 

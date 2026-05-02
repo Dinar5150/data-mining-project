@@ -1,0 +1,12 @@
+Selected test: xgboost_all_features
+threshold=0.407010
+              precision    recall  f1-score   support
+
+           0     0.1176    0.1000    0.1081        40
+           1     0.9620    0.9681    0.9650       941
+
+    accuracy                         0.9327       981
+   macro avg     0.5398    0.5341    0.5366       981
+weighted avg     0.9276    0.9327    0.9301       981
+
+confusion_matrix=[[4, 36], [30, 911]]

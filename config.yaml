@@ -17,7 +17,6 @@ dataset:
   max_changed_files: 30
   min_diff_lines: 50
   max_diff_lines: 2000
-  require_linked_issue: true
   require_source_patch: true
   store_full_diff: true
 

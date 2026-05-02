@@ -2,20 +2,30 @@
 
 \subsection{Select Data}
 
-The preparation stage uses all 7,563 records from \texttt{enriched\_prs\_raw.jsonl}. The modeling target is \texttt{review\_concern}: a pull request is positive if it has a \texttt{CHANGES\_REQUESTED} review or at least two meaningful review comments, negative if review activity exists without those signals, and excluded if review activity is absent. Only 7 records are excluded, leaving 7,556 labeled rows.
+The preparation stage uses all 10,000 enriched pull request records. The modeling unit remains one pull request workflow. The target is \texttt{review\_concern}: a row is positive if later review activity contains a \texttt{CHANGES\_REQUESTED} review or at least two meaningful review comments, negative if review activity exists without those signals, and excluded if review activity is absent. Only 9 rows lack review activity, leaving 9,991 labeled rows.
+
+The accepted/rejected quality flag is not used as the prediction target. It is retained only as audit metadata. This distinction is important because the project goal is not to predict whether a row passes curation, but whether a pull request will later receive substantive review concern.
 
 \subsection{Clean Data}
 
-The raw rows are not silently discarded. The existing project filters are applied to attach quality metadata, including bot authors, missing linked issues, documentation-only changes, missing source patches, and generated/vendor-only changes. These quality fields are retained for audit but are not used as model features. Review-derived counts and review states are also excluded from the feature matrix to avoid label leakage.
+The raw rows are not silently discarded. Instead, quality metadata is attached to each record. The main quality problems are bot authors, documentation-only changes, generated or vendor-only changes, missing source files, missing source patches, insufficient discussion, and insufficient meaningful review comments. These fields help audit the dataset but are not used as modeling features.
+
+Review-derived counts and review states are also excluded from the feature matrix. They are useful for defining the label, but they occur after the pull request is opened. Including them as features would leak the answer into the model and overstate performance.
 
 \subsection{Construct Data}
 
-Each row receives pull-request-intrinsic numeric features, one-hot language and author-association indicators, and a ModernBERT embedding of the source-code diff. The embedded text is the concatenation of source-code \texttt{files[].patch} values, capped at 1,000 ModernBERT tokens per pull request. The embedding model is \texttt{mlx-community/nomicai-modernbert-embed-base-4bit}, producing 768 embedding features.
+Each row is converted into three groups of features. The first group contains pull-request-intrinsic numeric features: changed files, additions, deletions, diff size, commit count, title and body length, source-file counts, source-patch counts, and capped source-patch token counts. The second group contains one-hot indicators for top source language and author association. The third group is a 768-dimensional ModernBERT embedding of the source-code diff.
+
+The embedded text is constructed from source-code \texttt{files[].patch} values. Because full diffs can be large, each row is capped at 1,000 ModernBERT tokens before embedding. This reduces total embedded content from 51.4 million raw tokens to 8.0 million capped tokens. The cap is a practical compromise: it keeps local embedding feasible while preserving a compact semantic representation of the changed code.
 
 \subsection{Integrate Data}
 
-Pull request metadata, changed-file metadata, linked issue fields, source patches, constructed labels, and quality metadata are integrated into one modeling row per pull request. The split is repository-level with seed 42, preventing the same repository from appearing in multiple splits.
+The prepared table integrates pull request metadata, changed-file summaries, source patches, constructed labels, quality metadata, and diff embeddings into one row per pull request. The split is performed at repository level with a fixed seed. This prevents pull requests from the same repository from appearing in both training and evaluation splits, which would otherwise inflate performance because repositories share conventions, file structure, and review style.
+
+The resulting labeled split contains 8,056 training rows, 954 validation rows, and 981 test rows. The class imbalance is strong: the training set contains 367 negative and 7,689 positive examples. This imbalance is carried into modeling and is the main reason why macro-F1 and balanced accuracy are reported alongside ranking metrics.
 
 \subsection{Format Data}
 
-The prepared files are written under \texttt{data/processed/modeling\_v0.1/}. The train matrix has 6,063 rows and the validation matrix has 717 rows, each with 805 numeric features. The ready-to-fit files are \texttt{dataset\_modeling\_v0.1.train.npz} and \texttt{dataset\_modeling\_v0.1.val.npz}; each contains \texttt{X}, \texttt{y}, feature names, and row identifiers. Parquet versions are also written for inspection.
+The final modeling matrix contains 802 numeric features: 14 pull-request numeric features, 20 one-hot categorical indicators, and 768 embedding dimensions. The same feature schema is used for training, validation, and test data, so the matrices can be passed directly to standard \texttt{.fit()} and \texttt{.predict()} workflows.
+
+Overall, data preparation converts the raw enriched pull request collection into a leakage-safe modeling dataset. The main preparation decisions are to retain all raw rows for audit, exclude post-review variables from the feature matrix, cap long diffs to 1,000 tokens, represent code changes with ModernBERT embeddings, and split by repository to obtain a more realistic estimate of generalization.

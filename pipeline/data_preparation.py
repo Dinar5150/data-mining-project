@@ -24,8 +24,9 @@ from pipeline.filters import (
     top_source_language,
 )
 
-DEFAULT_RAW_PATH = "enriched_prs_raw.jsonl"
-DEFAULT_OUTPUT_DIR = "data/processed/modeling_v0.1"
+DEFAULT_RAW_PATH = "enriched_prs_raw_new.jsonl"
+DEFAULT_OUTPUT_DIR = "data/processed/modeling_v0.2"
+DEFAULT_DATASET_VERSION = "dataset_modeling_v0.2"
 DEFAULT_EMBEDDING_MODEL = "mlx-community/nomicai-modernbert-embed-base-4bit"
 DEFAULT_TOKEN_CAP = 1000
 DEFAULT_BATCH_SIZE = 32
@@ -76,7 +77,6 @@ def _base_row(
     token_cap: int,
 ) -> dict[str, Any]:
     pr = row.get("pr") or {}
-    linked_issue = row.get("linked_issue") or {}
     files = row.get("files") or []
     filenames = [item.get("filename") for item in files if item.get("filename")]
     source_files = [filename for filename in filenames if is_source_file(filename)]
@@ -104,12 +104,9 @@ def _base_row(
         "deletions": int(deletions),
         "diff_lines": int(additions + deletions),
         "commits": int(pr.get("commits") or 0),
-        "has_linked_issue": int(bool(row.get("linked_issue_number") and linked_issue)),
         "pr_title_length": len(pr.get("title") or ""),
         "pr_body_length": len(pr.get("body") or ""),
         "has_pr_body": int(bool(pr.get("body"))),
-        "issue_title_length": len(linked_issue.get("title") or ""),
-        "issue_body_length": len(linked_issue.get("body") or ""),
         "source_file_count": len(source_files),
         "source_patch_count": len(source_patches),
         "source_file_ratio": (
@@ -262,11 +259,12 @@ def _split_by_repo(
     }
     dataframe["split"] = dataframe["repo"].map(split_for_repo).fillna("excluded")
 
+    labeled_mask = dataframe[TARGET_COLUMN].notna()
     return {
         "all": dataframe.copy(),
-        "train": dataframe[dataframe["split"] == "train"].copy(),
-        "val": dataframe[dataframe["split"] == "val"].copy(),
-        "test": dataframe[dataframe["split"] == "test"].copy(),
+        "train": dataframe[(dataframe["split"] == "train") & labeled_mask].copy(),
+        "val": dataframe[(dataframe["split"] == "val") & labeled_mask].copy(),
+        "test": dataframe[(dataframe["split"] == "test") & labeled_mask].copy(),
     }
 
 
@@ -293,27 +291,28 @@ def _write_npz(
 def _write_outputs(
     splits: dict[str, pd.DataFrame],
     output_dir: Path,
+    dataset_version: str,
     feature_columns: list[str],
     summary: dict[str, Any],
     manifest: dict[str, Any],
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     for split_name, dataframe in splits.items():
-        parquet_path = output_dir / f"dataset_modeling_v0.1.{split_name}.parquet"
+        parquet_path = output_dir / f"{dataset_version}.{split_name}.parquet"
         dataframe.to_parquet(parquet_path, index=False)
         if split_name != "all":
             _write_npz(
-                output_dir / f"dataset_modeling_v0.1.{split_name}.npz",
+                output_dir / f"{dataset_version}.{split_name}.npz",
                 dataframe,
                 feature_columns,
                 TARGET_COLUMN,
             )
 
-    (output_dir / "dataset_modeling_v0.1.feature_manifest.json").write_text(
+    (output_dir / f"{dataset_version}.feature_manifest.json").write_text(
         json.dumps(manifest, indent=2),
         encoding="utf-8",
     )
-    (output_dir / "dataset_modeling_v0.1.preparation_summary.json").write_text(
+    (output_dir / f"{dataset_version}.preparation_summary.json").write_text(
         json.dumps(summary, indent=2),
         encoding="utf-8",
     )
@@ -326,6 +325,7 @@ def prepare_modeling_data(
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     token_cap: int = DEFAULT_TOKEN_CAP,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    dataset_version: str = DEFAULT_DATASET_VERSION,
 ) -> dict[str, Any]:
     raw_path = Path(raw_path)
     output_dir = Path(output_dir)
@@ -362,12 +362,9 @@ def prepare_modeling_data(
         "deletions",
         "diff_lines",
         "commits",
-        "has_linked_issue",
         "pr_title_length",
         "pr_body_length",
         "has_pr_body",
-        "issue_title_length",
-        "issue_body_length",
         "source_file_count",
         "source_patch_count",
         "source_file_ratio",
@@ -397,6 +394,7 @@ def prepare_modeling_data(
         }
 
     manifest = {
+        "dataset_version": dataset_version,
         "target_column": TARGET_COLUMN,
         "feature_columns": feature_columns,
         "metadata_columns": [
@@ -433,6 +431,7 @@ def prepare_modeling_data(
             "embedding_token_cap": token_cap,
             "embedding_batch_size": batch_size,
             "embedding_dimensions": int(embeddings.shape[1]),
+            "dataset_version": dataset_version,
             "feature_count": len(feature_columns),
             "split_summary": split_summary,
         }
@@ -441,6 +440,7 @@ def prepare_modeling_data(
     _write_outputs(
         splits=splits,
         output_dir=output_dir,
+        dataset_version=dataset_version,
         feature_columns=feature_columns,
         summary=summary,
         manifest=manifest,
@@ -458,6 +458,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--token-cap", type=int, default=DEFAULT_TOKEN_CAP)
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
+    parser.add_argument("--dataset-version", default=DEFAULT_DATASET_VERSION)
     return parser.parse_args()
 
 
@@ -470,6 +471,7 @@ def main() -> None:
         embedding_model=args.embedding_model,
         token_cap=args.token_cap,
         batch_size=args.batch_size,
+        dataset_version=args.dataset_version,
     )
     print(json.dumps(summary, indent=2))
 

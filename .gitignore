@@ -3,7 +3,11 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+*.aux
+*.log
+*.out
 enriched_prs_raw.jsonl
+enriched_prs_raw_new.jsonl
 
 data/candidates/*
 !data/candidates/.gitkeep
@@ -15,3 +19,5 @@ data/audit/*
 !data/audit/.gitkeep
 reports/*
 !reports/.gitkeep
+!reports/modeling_v0.2/
+!reports/modeling_v0.2/*

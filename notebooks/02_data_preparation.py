@@ -20,16 +20,18 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from pipeline.data_preparation import prepare_modeling_data
 
-OUTPUT_DIR = PROJECT_ROOT / "data/processed/modeling_v0.1"
+DATASET_VERSION = "dataset_modeling_v0.2"
+OUTPUT_DIR = PROJECT_ROOT / "data/processed/modeling_v0.2"
 RUN_PREPARATION = False
 
 if RUN_PREPARATION:
     prepare_modeling_data(
-        raw_path=PROJECT_ROOT / "enriched_prs_raw.jsonl",
+        raw_path=PROJECT_ROOT / "enriched_prs_raw_new.jsonl",
         output_dir=OUTPUT_DIR,
         config_path=PROJECT_ROOT / "config.yaml",
         token_cap=1000,
         batch_size=32,
+        dataset_version=DATASET_VERSION,
     )
 
 # %% [markdown]
@@ -41,19 +43,19 @@ if RUN_PREPARATION:
 
 # %%
 summary = json.loads(
-    (OUTPUT_DIR / "dataset_modeling_v0.1.preparation_summary.json").read_text()
+    (OUTPUT_DIR / f"{DATASET_VERSION}.preparation_summary.json").read_text()
 )
 manifest = json.loads(
-    (OUTPUT_DIR / "dataset_modeling_v0.1.feature_manifest.json").read_text()
+    (OUTPUT_DIR / f"{DATASET_VERSION}.feature_manifest.json").read_text()
 )
 summary["split_summary"]
 
 # %% [markdown]
 # ## Clean Data
 #
-# Bot, documentation-only, generated/vendor-only, missing source patch, and
-# linked-issue failures are retained as quality metadata. They are not used as
-# model features.
+# Bot authors, documentation-only changes, generated/vendor-only changes, and
+# missing source patches are retained as quality metadata. These fields are kept
+# for audit and are not used as model features.
 
 # %%
 pd.DataFrame(summary["top_reject_reasons"], columns=["reason", "rows"])
@@ -74,12 +76,12 @@ print("token_cap:", manifest["embedding_token_cap"])
 # %% [markdown]
 # ## Integrate Data
 #
-# Pull request metadata, linked issue data, changed files, and source patches
-# are integrated into one row per pull request.
+# Pull request metadata, changed-file summaries, source patches, labels, and
+# quality metadata are integrated into one row per pull request.
 
 # %%
 all_df = pd.read_parquet(
-    OUTPUT_DIR / "dataset_modeling_v0.1.all.parquet",
+    OUTPUT_DIR / f"{DATASET_VERSION}.all.parquet",
     columns=[
         "example_id",
         "repo",
@@ -100,8 +102,8 @@ all_df.head()
 # to scikit-learn style `.fit()` and `.predict()` calls.
 
 # %%
-train = np.load(OUTPUT_DIR / "dataset_modeling_v0.1.train.npz")
-val = np.load(OUTPUT_DIR / "dataset_modeling_v0.1.val.npz")
+train = np.load(OUTPUT_DIR / f"{DATASET_VERSION}.train.npz")
+val = np.load(OUTPUT_DIR / f"{DATASET_VERSION}.val.npz")
 print("train:", train["X"].shape, train["y"].shape, np.bincount(train["y"]))
 print("val:", val["X"].shape, val["y"].shape, np.bincount(val["y"]))
 

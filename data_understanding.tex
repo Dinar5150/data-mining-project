@@ -2,22 +2,19 @@
 
 \subsection{Collect Initial Data}
 
-\subsubsection*{Initial Data Collection}
-The raw dataset is \texttt{enriched\_prs\_raw.jsonl}. Candidate pull requests were first selected from GH Archive by finding merged pull request events and joining them with issue comment, review, and review comment activity for the same repository and pull request number.
+The raw dataset contains enriched public GitHub pull requests. Candidate pull requests were discovered from GH Archive by selecting merged pull request events and joining them with review and discussion activity for the same repository and pull request number. The candidate filter kept medium-sized pull requests: 2--30 changed files, 50--2000 changed lines, at least two discussion comments, at least one formal review, and at least two review comments.
 
-The candidate filter kept pull requests with 2--30 changed files, 50--2000 changed lines, at least two issue comment events, at least one review event, and at least two review comment events. Each candidate was then enriched through the GitHub REST API with pull request metadata, changed files, formal reviews, inline review comments, pull request comments, the full unified diff, and linked issue data when available. Linked issues were detected from closing-keyword references such as \texttt{fixes \#123} in the pull request title or body.
+Each candidate was then enriched through the GitHub REST API. The enrichment added the pull request object, changed-file list, formal reviews, inline review comments, pull request discussion comments, full unified diff, API error metadata, and retrieval timestamp. This produces a rich raw layer, but not yet the final curated modeling dataset.
 
 \subsection{Describe Data}
 
-\subsubsection*{Data Description}
-The collected raw file contains 7,563 enriched pull request records and occupies about 1.2 GB. It covers 4,758 repositories and 6,529 authors. Most pull requests were created and merged in March 2025; enrichment was retrieved on April 30, 2026 and May 1, 2026.
+The collected raw file contains 10,000 enriched pull request records and occupies about 1.78 GB. It covers 6,033 repositories and 8,610 authors. Most pull requests were created and merged from March to May 2025, while enrichment was retrieved on May 1--2, 2026.
 
-Each raw record contains the candidate row, pull request object, changed-file list, formal reviews, inline review comments, pull request comments, full diff, linked issue, linked issue comments, API errors, and retrieval timestamp. The current raw layer is enriched data, not yet the final accepted dataset.
+The dataset is broad but not uniform. Large active repositories naturally contribute more pull requests, so the collection has a long-tailed repository distribution. The largest repositories include \texttt{llvm/llvm-project}, \texttt{WebKit/WebKit}, and \texttt{Automattic/wp-calypso}. This concentration is expected for public GitHub data and motivates the repository-level split used later.
 
 \subsection{Explore Data}
 
-\subsubsection*{Exploration Results}
-The notebook \texttt{notebooks/01\_data\_understanding.ipynb} computes the statistics and regenerates the plots below. The collection is broad across repositories but concentrated in a few large projects. The largest repositories include \texttt{llvm/llvm-project}, \texttt{kubernetes/kubernetes}, and \texttt{openshift/release}.
+The first exploration question is whether the collection has enough scale and temporal coverage. The timeline plot shows that the selected pull requests are concentrated in a recent 2025 window, which is acceptable for the current project because the goal is a contemporary workflow dataset rather than a historical trend analysis.
 
 \begin{figure}[htbp]
     \centering
@@ -25,11 +22,15 @@ The notebook \texttt{notebooks/01\_data\_understanding.ipynb} computes the stati
     \caption{Pull request creation and merge month distribution.}
 \end{figure}
 
+The second question is whether the enriched fields are sufficiently complete. Pull request objects are present in 100.00\% of records, file lists in 99.99\%, full diffs in 99.96\%, formal reviews in 99.91\%, review comments in 99.82\%, and pull request comments in 99.78\%. Source files appear in 83.61\% of records. This is enough for analysis, although records without source files or source patches must be marked as lower quality.
+
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\linewidth]{figures/data_understanding/schema_completeness.png}
     \caption{Completeness of key enriched fields.}
 \end{figure}
+
+The pull requests are mostly small to medium-sized, as intended by the candidate filter. The median pull request has 7 changed files and 261 changed lines. The distributions remain skewed, especially for additions, deletions, commits, and full-diff character count; therefore, the preparation stage uses capped tokenized diff embeddings instead of feeding complete diffs directly into a model.
 
 \begin{figure}[htbp]
     \centering
@@ -37,11 +38,15 @@ The notebook \texttt{notebooks/01\_data\_understanding.ipynb} computes the stati
     \caption{Pull request size distributions.}
 \end{figure}
 
+Review activity is also skewed but sufficient. The median record has 6 formal reviews, 6 inline review comments, 6 meaningful review comments, and 3 pull request discussion comments. This supports the downstream target because most records contain enough reviewer activity to decide whether a concern was raised.
+
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\linewidth]{figures/data_understanding/review_activity.png}
     \caption{Review and discussion activity distributions.}
 \end{figure}
+
+The language distribution is diverse. TypeScript, Python, Java, Go, Rust, JavaScript, C++, C/C++, C\#, and Kotlin are the most common source languages. This is useful for the dataset goal because the model should not be tied to one ecosystem.
 
 \begin{figure}[htbp]
     \centering
@@ -49,10 +54,12 @@ The notebook \texttt{notebooks/01\_data\_understanding.ipynb} computes the stati
     \caption{Top source languages and file extensions.}
 \end{figure}
 
+Under the current quality filters, 7,373 records pass and 2,627 are rejected. The dominant rejection reasons are missing source-code patches, missing source files, insufficient discussion, insufficient meaningful review comments, and documentation-only changes. These failures are expected in public repository data and justify retaining quality metadata instead of assuming that every enriched pull request is modeling-ready.
+
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\linewidth]{figures/data_understanding/quality_filters.png}
-    \caption{Accepted versus rejected traces and top rejection reasons under current filters.}
+    \caption{Accepted versus rejected records and top rejection reasons under current filters.}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -63,7 +70,6 @@ The notebook \texttt{notebooks/01\_data\_understanding.ipynb} computes the stati
 
 \subsection{Verify Data Quality}
 
-\subsubsection*{Quality Verification}
-Raw enrichment quality is sufficient for analysis, but the file is not yet the final curated dataset. Pull request objects, file lists, and full diffs are present in 100\% of records. Formal reviews are present in 99.9\%, and review comments are present in 99.7\%.
+The raw enrichment quality is sufficient for the next CRISP-DM stage. The dataset has enough scale, broad repository coverage, diverse languages, and high completeness for core pull request, review, comment, and diff fields. The main limitations are not missing metadata but unsuitable records: non-source changes, absent source patches, short discussions, and weak review-comment content.
 
-The main quality limitation is linked issue coverage: only 924 records, or 12.2\%, contain an explicit linked issue resolved by the current regex. Under the current strict filters, 721 records pass as accepted traces, equal to 9.5\% of the raw enriched file. The dominant rejection reason is \texttt{no\_explicit\_linked\_issue}, followed by missing source-code patches or source files. The next preparation stage should therefore either preserve the strict linked-issue requirement and expand collection volume, or revise the linked-issue extraction rule if higher recall is required.
+Therefore, the raw file should not be used directly for modeling. It should first be transformed into a leakage-safe table, with quality flags retained for audit and with review-derived variables excluded from the feature matrix. The data is suitable for preparation and baseline modeling, but the later model should be interpreted as a proof of signal rather than a production review-concern detector.

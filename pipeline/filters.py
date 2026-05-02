@@ -173,19 +173,12 @@ def evaluate_example(
     reviews = enriched["reviews"]
     review_comments = enriched["review_comments"]
     pr_comments = enriched["pr_comments"]
-    linked_issue = enriched["linked_issue"]
-    linked_issue_comments = enriched["linked_issue_comments"]
     full_diff = enriched.get("full_diff")
 
     reject_reasons: list[str] = []
 
     if not pr.get("merged"):
         reject_reasons.append("not_merged")
-
-    if dataset_config.require_linked_issue and (
-        not enriched.get("linked_issue_number") or not linked_issue
-    ):
-        reject_reasons.append("no_explicit_linked_issue")
 
     author_login = (pr.get("user") or {}).get("login")
     if filter_config.exclude_bots and is_bot_login(author_login):
@@ -246,7 +239,7 @@ def evaluate_example(
     if len(meaningful_review_comments) < dataset_config.min_meaningful_review_comments:
         reject_reasons.append("not_enough_meaningful_review_comments")
 
-    discussion_count = len(pr_comments) + len(linked_issue_comments)
+    discussion_count = len(pr_comments)
     if discussion_count < dataset_config.min_discussion_comments:
         reject_reasons.append("not_enough_discussion")
 
@@ -255,8 +248,6 @@ def evaluate_example(
 
     score = 0
     if pr.get("merged"):
-        score += 20
-    if enriched.get("linked_issue_number"):
         score += 20
     if len(meaningful_review_comments) >= dataset_config.min_meaningful_review_comments:
         score += 20

@@ -1,0 +1,208 @@
+{
+  "dataset_version": "dataset_modeling_v0.2",
+  "data_dir": "data/processed/modeling_v0.2",
+  "report_dir": "reports/modeling_v0.2",
+  "figure_dir": "figures/modeling",
+  "class_balance": {
+    "train": [
+      367,
+      7689
+    ],
+    "val": [
+      39,
+      915
+    ],
+    "test": [
+      40,
+      941
+    ]
+  },
+  "models": [
+    {
+      "model": "xgboost_all_features",
+      "feature_set": "all",
+      "feature_count": 802,
+      "fit_seconds": 1.486,
+      "val_roc_auc": 0.6384895614403812,
+      "val_average_precision": 0.9758477750344403,
+      "val_brier": 0.11710735410451889,
+      "val_threshold": 0.4070095241069794,
+      "val_macro_f1": 0.532156368221942,
+      "val_positive_f1": 0.9617486338797814,
+      "val_balanced_accuracy": 0.532156368221942,
+      "val_confusion_matrix": [
+        [
+          4,
+          35
+        ],
+        [
+          35,
+          880
+        ]
+      ],
+      "test_roc_auc": 0.6277895855472901,
+      "test_average_precision": 0.9757713743408221,
+      "test_brier": 0.116554856300354,
+      "test_threshold": 0.4070095241069794,
+      "test_macro_f1": 0.536575240494732,
+      "test_positive_f1": 0.965042372881356,
+      "test_balanced_accuracy": 0.5340595111583422,
+      "test_confusion_matrix": [
+        [
+          4,
+          36
+        ],
+        [
+          30,
+          911
+        ]
+      ]
+    },
+    {
+      "model": "logistic_all_features",
+      "feature_set": "all",
+      "feature_count": 802,
+      "fit_seconds": 0.762,
+      "val_roc_auc": 0.5989351268039793,
+      "val_average_precision": 0.9731619345146509,
+      "val_brier": 0.17314094305038452,
+      "val_threshold": 0.08062138542532925,
+      "val_macro_f1": 0.5166650537665014,
+      "val_positive_f1": 0.950855880728879,
+      "val_balanced_accuracy": 0.5217738545607398,
+      "val_confusion_matrix": [
+        [
+          4,
+          35
+        ],
+        [
+          54,
+          861
+        ]
+      ],
+      "test_roc_auc": null,
+      "test_average_precision": null,
+      "test_brier": null,
+      "test_threshold": null,
+      "test_macro_f1": null,
+      "test_positive_f1": null,
+      "test_balanced_accuracy": null,
+      "test_confusion_matrix": null
+    },
+    {
+      "model": "xgboost_tabular",
+      "feature_set": "tabular",
+      "feature_count": 34,
+      "fit_seconds": 0.104,
+      "val_roc_auc": 0.5667367241137734,
+      "val_average_precision": 0.9691601545835398,
+      "val_brier": 0.17512640357017517,
+      "val_threshold": 0.3333944582939148,
+      "val_macro_f1": 0.5058035943005801,
+      "val_positive_f1": 0.9497515184980674,
+      "val_balanced_accuracy": 0.5084068936527953,
+      "val_confusion_matrix": [
+        [
+          3,
+          36
+        ],
+        [
+          55,
+          860
+        ]
+      ],
+      "test_roc_auc": null,
+      "test_average_precision": null,
+      "test_brier": null,
+      "test_threshold": null,
+      "test_macro_f1": null,
+      "test_positive_f1": null,
+      "test_balanced_accuracy": null,
+      "test_confusion_matrix": null
+    },
+    {
+      "model": "logistic_tabular",
+      "feature_set": "tabular",
+      "feature_count": 34,
+      "fit_seconds": 0.014,
+      "val_roc_auc": 0.5389939750595488,
+      "val_average_precision": 0.9653751712980448,
+      "val_brier": 0.24028043448925018,
+      "val_threshold": 0.33631030201911927,
+      "val_macro_f1": 0.5105438401775805,
+      "val_positive_f1": 0.9456159822419534,
+      "val_balanced_accuracy": 0.5168558217738546,
+      "val_confusion_matrix": [
+        [
+          4,
+          35
+        ],
+        [
+          63,
+          852
+        ]
+      ],
+      "test_roc_auc": null,
+      "test_average_precision": null,
+      "test_brier": null,
+      "test_threshold": null,
+      "test_macro_f1": null,
+      "test_positive_f1": null,
+      "test_balanced_accuracy": null,
+      "test_confusion_matrix": null
+    },
+    {
+      "model": "majority_baseline",
+      "feature_set": "none",
+      "feature_count": 0,
+      "fit_seconds": 0.0,
+      "val_roc_auc": 0.5,
+      "val_average_precision": 0.9591194968553459,
+      "val_brier": 0.04088050499558449,
+      "val_threshold": 0.5,
+      "val_macro_f1": 0.4895666131621188,
+      "val_positive_f1": 0.9791332263242376,
+      "val_balanced_accuracy": 0.5,
+      "val_confusion_matrix": [
+        [
+          0,
+          39
+        ],
+        [
+          0,
+          915
+        ]
+      ],
+      "test_roc_auc": null,
+      "test_average_precision": null,
+      "test_brier": null,
+      "test_threshold": null,
+      "test_macro_f1": null,
+      "test_positive_f1": null,
+      "test_balanced_accuracy": null,
+      "test_confusion_matrix": null
+    }
+  ],
+  "selected_model": "xgboost_all_features",
+  "selection_rule": "highest validation ROC-AUC, with validation macro-F1 used for thresholded sanity check",
+  "selected_threshold": 0.4070095241069794,
+  "test_metrics_for_selected_model": {
+    "test_roc_auc": 0.6277895855472901,
+    "test_average_precision": 0.9757713743408221,
+    "test_brier": 0.116554856300354,
+    "test_threshold": 0.4070095241069794,
+    "test_macro_f1": 0.536575240494732,
+    "test_positive_f1": 0.965042372881356,
+    "test_balanced_accuracy": 0.5340595111583422,
+    "test_confusion_matrix": [
+      [
+        4,
+        36
+      ],
+      [
+        30,
+        911
+      ]
+    ]
+  }
+}
