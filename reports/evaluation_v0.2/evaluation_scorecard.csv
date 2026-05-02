@@ -3,4 +3,4 @@ criterion,target,measured,status,interpretation
 Broad multi-repository coverage,multi-repository dataset,"6,033 repositories",pass,The collection is not limited to one project or ecosystem.
 Downstream model beats random ranking,ROC-AUC > 0.500,0.628,pass,The data contains learnable signal for review-concern ranking.
 Downstream model beats majority baseline,macro-F1 > 0.490,0.537,pass,The selected model improves over predicting only the dominant class.
-Demonstrable deployment artifact,usable dataset and demo application,Hugging Face dataset and Streamlit demo,pass,"The result can be inspected and demonstrated, with clear limitations."
+Demonstrable deployment artifact,usable dataset and demo application,Hugging Face dataset and runnable Streamlit demo,pass,"The result can be inspected and demonstrated, with clear limitations."

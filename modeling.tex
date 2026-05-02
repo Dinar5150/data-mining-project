@@ -2,7 +2,7 @@
 
 \subsection{Select Modeling Technique}
 
-The modeling task is binary classification for \texttt{review\_concern}. A positive example is a pull request that later receives a substantive concern signal during review; a negative example has review activity but no such signal. The task is difficult because the model only sees information available at pull request opening time, while the label is determined by later reviewer behavior.
+The modeling task is binary classification for \texttt{review\_concern}. A positive example is a pull request that receives a substantive concern signal during review; a negative example has review activity but no such signal. The task is difficult because the model uses only pull-request-intrinsic metadata, changed-file summaries, and code-diff embeddings, while the label is determined from review behavior.
 
 Five model candidates were compared. The majority-class baseline measures how much can be achieved by exploiting class imbalance only. Logistic regression is used as a linear reference, first on tabular pull request features and then on the full feature set. XGBoost is used as the main non-linear candidate because it can combine numeric metadata, sparse indicators, and dense diff embeddings. The all-feature models use 802 features, including the 768-dimensional capped ModernBERT representation of the source-code diff.
 

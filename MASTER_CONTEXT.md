@@ -77,8 +77,8 @@ The software resources consist of the project codebase, a standard Python 3.10 e
 Key assumptions underpinning the project are the following:
 
 - public GitHub activity is sufficiently representative of real engineering workflows to train models whose behavior transfers to private codebases;
-- rule-based filtering is sufficient to reach usable quality without full manual labeling (verified during evaluation through an audit sample);
-- the `review_concern` label, defined in section 1.3, captures a real and useful signal about the quality of a pull request at the moment it is opened;
+- rule-based filtering is sufficient for a first curated dataset, but manual audit remains a next-iteration requirement;
+- the `review_concern` label, defined in section 1.3, captures a useful review-activity signal, but it is still a proxy rather than a direct measure of true software risk;
 - splitting data by repository is sufficient to prevent train/test leakage for the scope of this project; time-based splitting is deferred to a future version.
 
 Constraints apply primarily to data access and compute. The GitHub REST API imposes a rate limit of approximately five thousand requests per hour per token, which sets an upper bound on enrichment throughput. The project operates on public repositories only. Local disk and memory are sufficient for dataset sizes in the low tens of thousands of traces but would require revisiting for significantly larger runs.
@@ -87,7 +87,7 @@ Constraints apply primarily to data access and compute. The GitHub REST API impo
 
 Several risks affect delivery.
 
-- **Data quality.** GH Archive events are noisy; bots produce a large fraction of surface-level activity; trivial or generated changes are common; and not every repository exposes a clean pull-request-to-review-to-merge chain. The pipeline mitigates this risk through multi-stage filtering, including bot heuristics, size thresholds, discussion and review requirements, and file-level filters on generated and vendored content. A residual-noise check is performed on an audit sample during evaluation.
+- **Data quality.** GH Archive events are noisy; bots produce a large fraction of surface-level activity; trivial or generated changes are common; and not every repository exposes a clean pull-request-to-review-to-merge chain. The pipeline mitigates this risk through multi-stage filtering, including bot heuristics, size thresholds, discussion and review requirements, and file-level filters on generated and vendored content. A residual-noise audit is still needed in a later iteration.
 - **Label imbalance.** The `review_concern` negative class is rare in the current dataset; modeling therefore reports macro-F1 and balanced accuracy instead of relying on accuracy alone.
 - **Insufficient candidate volume.** The chosen time windows may yield too few candidates; the pipeline is designed to extend easily to additional time windows if needed.
 - **API quota exhaustion.** GitHub rate limits may be hit during large enrichment runs; the client handles this through retry with backoff and explicit rate-limit-aware sleeps.
@@ -108,7 +108,7 @@ Translated into data mining terms, the business objective corresponds to the fol
 
 **Goal 1 — corpus construction.** Construct at least five thousand accepted workflow traces, with a target of about ten thousand traces. One trace is one pull request-centered workflow record. Accepted means that the trace passed the project filters: merged pull request, source-code changes, non-empty diff, review and discussion activity, and no bot, generated-only, documentation-only, or trivial-change pattern. Each accepted trace should follow the fixed schema consisting of discussion, pull request metadata, review activity, code diff, quality metadata, and provenance.
 
-**Goal 2 — supervised classifier.** Construct a supervised binary classifier for a task named `review_concern`. Given a pull request at the moment it is opened, the classifier predicts whether reviewers will raise substantive concerns during review.
+**Goal 2 — supervised classifier.** Construct a supervised binary classifier for a task named `review_concern`. Given pull-request-intrinsic metadata, changed-file summaries, and code-diff embeddings from the enriched record, the classifier predicts whether review activity contains substantive concern signals.
 
 The label is defined as follows:
 
@@ -116,7 +116,7 @@ The label is defined as follows:
 - **negative (0):** the pull request received review activity but no concerns meeting the positive threshold;
 - **excluded:** pull requests with no review activity at all.
 
-A strict separation is maintained between features available at prediction time, which are intrinsic to the pull request, and features derived from review activity, which are available only after the fact and are excluded from the training feature set.
+A strict separation is maintained between pull-request-intrinsic features and features derived from review activity. Review-derived features are excluded from the training feature set. The current enriched GitHub API records were retrieved after merge, so the diff and pull request metadata should not be described as a strict opening-time snapshot.
 
 Three modeling variants are planned in order of increasing complexity:
 
@@ -135,7 +135,7 @@ On the **data** side, success is defined by four quantitative targets:
 - the final dataset contains at least five thousand accepted traces and targets approximately ten thousand;
 - it spans at least five hundred unique repositories and at least three source-code languages;
 - trace completeness — the proportion of accepted traces that contain a merged pull request, at least one review, source-code patch data, and a non-empty diff — is at least ninety-five percent;
-- a manual audit of one hundred accepted traces finds trivial, documentation-only, or otherwise unsuitable traces at a rate below ten percent.
+- a future manual audit of one hundred accepted traces should find trivial, documentation-only, or otherwise unsuitable traces at a rate below ten percent.
 
 On the **modeling** side, success is defined by two quantitative targets on the held-out test set:
 
@@ -157,7 +157,7 @@ The project is organized into the six CRISP-DM phases and is expected to iterate
 - **Evaluation** is consolidated in an evaluation scorecard that checks each data and modeling success criterion against its target.
 - **Deployment** delivers the final dataset, the reference model, and the accompanying documentation.
 
-The project consumes a single data pipeline run on a larger time window than the MVP, producing the `dataset_v1.0` release, followed by modeling and evaluation work on that release. Iteration between phases is expected: in particular, the data preparation phase will be revisited once the `review_concern` label distribution is measured, and the feature table will be revisited once the first modeling results are available.
+The current project consumes a single data pipeline run on the expanded raw file `enriched_prs_raw_new.jsonl`, producing the `dataset_modeling_v0.2` preparation and modeling artifacts. Iteration between phases is expected: in particular, label design, quality audit, and feature extraction should be revisited in the next CRISP-DM cycle.
 
 #### 1.4.2 Initial Assessment of Tools and Techniques
 
@@ -168,7 +168,7 @@ The pipeline is implemented in Python with a small, conventional stack: `request
 Two user groups are targeted explicitly.
 
 - **ML researchers and engineers at AI companies** building coding assistants, code review automation, or autonomous developer agents. They use the dataset to fine-tune or evaluate language models on workflow-context tasks such as generating review comments, predicting review concerns, or producing patches from issues.
-- **Engineering teams inside software companies** who train internal models to assist their own code review process. Their primary use case is predicting, at pull request opening time, whether the pull request is likely to attract substantive review concerns, so that reviewer attention can be prioritized accordingly.
+- **Engineering teams inside software companies** who train internal models to assist their own code review process. Their primary use case is studying whether pull request metadata and code diffs contain signals about later substantive review concerns.
 
 ### 1.6 Scope and Non-Goals
 
@@ -198,7 +198,7 @@ The current raw collected file is `enriched_prs_raw_new.jsonl` in the repository
 
 ### 2.2 Describe Data
 
-The raw file contains 10,000 enriched pull request records and occupies about 1.78 GB. It covers 6,033 repositories and 8,610 authors. Most pull requests were created and merged from March to May 2025; enrichment was retrieved on May 1 and May 2, 2026.
+The raw file contains 10,000 enriched pull request records and occupies about 1.78 GiB, or about 1.91 decimal GB. It covers 6,033 repositories and 8,610 authors. Most pull requests were created and merged from March to May 2025; enrichment was retrieved on May 1 and May 2, 2026.
 
 Each raw record contains `candidate`, `pr`, `files`, `reviews`, `review_comments`, `pr_comments`, `full_diff`, `api_errors`, and `retrieved_at`. This is the enriched raw layer, not yet the final accepted dataset. The processed trace schema is still defined by section 9.
 
@@ -329,7 +329,7 @@ The result is partially successful.
 
 - Dataset objective: passed. The project has 10,000 enriched workflows, 7,373 quality-accepted rows, and 6,033 repositories.
 - Modeling objective: passed at baseline-validation level. The selected XGBoost model reaches test ROC-AUC 0.628 and macro-F1 0.537, beating random ranking and the majority-class baseline.
-- Deployment artifact objective: passed for demonstration. The Hugging Face dataset and Streamlit demo are available.
+- Deployment artifact objective: passed for demonstration. The Hugging Face dataset page and runnable local Streamlit demo are available as demonstration artifacts.
 
 The evaluation scorecard is generated by `pipeline/evaluation.py` and stored in `reports/evaluation_v0.2/`. The plot is under `figures/evaluation/evaluation_scorecard.png`.
 
@@ -433,9 +433,9 @@ Plain-language definitions of every term used in this project. Grouped by topic.
 
 **Review concern label** — The binary modeling target. 1 = reviewers raised substantive concerns. 0 = review happened but no concerns. Excluded = no review at all. See [Section 4.1](#41-modeling-task).
 
-**Label leakage** — Using a feature the model would not have at prediction time. For us, prediction time = PR opening. Any review-derived feature is leakage.
+**Label leakage** — Using a feature that directly encodes the target. In this project, review-derived counts, review states, and review comments are excluded from the feature matrix because they define or closely follow the `review_concern` label.
 
-**PR-intrinsic feature** — Computable at PR opening: title, body, files, size, and author. Safe for training.
+**PR-intrinsic feature** — A feature derived from pull request metadata, changed files, or code diff text rather than from review outcomes. In this project these fields come from the enriched retrieved PR record, not a guaranteed opening-time snapshot.
 
 **Review-derived feature** — Only available after review activity. Excluded from training.
 

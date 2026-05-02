@@ -17,7 +17,7 @@ Curated workflow volume & At least 5,000 accepted rows & 7,373 & Pass \\
 Repository coverage & Multi-repository dataset & 6,033 repositories & Pass \\
 Ranking signal & ROC-AUC above 0.500 & 0.628 & Pass \\
 Baseline improvement & Macro-F1 above 0.490 & 0.537 & Pass \\
-Demonstrable artifact & Dataset and demo application & Available & Pass \\
+Demonstrable artifact & Dataset and demo application & Dataset page and local demo & Pass \\
 \hline
 \end{tabular}
 \caption{Evaluation scorecard against the project success criteria.}
@@ -39,7 +39,7 @@ The CRISP-DM process was followed correctly in structure. Business Understanding
 
 Several choices were appropriate for a first iteration. Removing post-review variables from the feature matrix avoided label leakage. Splitting by repository made evaluation more realistic than random row-level splitting. Comparing tabular-only and embedding-based models made it possible to see that code-diff embeddings help, but only moderately. The Streamlit demo also makes the result inspectable rather than leaving it as a static metric table.
 
-The main weakness is that the evaluation remains offline. There is no manual audit sample yet, no external time-based test set, and no direct feedback from intended users. The current label is also only a proxy for review concern: it captures explicit review activity, not necessarily true software risk. In addition, the 1,000-token cap compresses large diffs aggressively, and the model does not reason over repository history or full discussion context. These limitations mean that the project is strong enough as a data mining assignment and dataset demonstrator, but weak as an operational review-assistance system.
+The main weakness is that the evaluation remains offline. There is no manual audit sample yet, no external time-based test set, and no direct feedback from intended users. The current label is also only a proxy for review concern: it captures explicit review activity, not necessarily true software risk. In addition, the enriched GitHub API records were retrieved after merge, so the diff and pull request metadata should be treated as a retrieved PR state rather than a strict opening-time snapshot. The 1,000-token cap also compresses large diffs aggressively, and the model does not reason over repository history or full discussion context. These limitations mean that the project is strong enough as a data mining assignment and dataset demonstrator, but not enough for stronger product claims.
 
 \subsection{Determine Next Steps}
 

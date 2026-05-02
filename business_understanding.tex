@@ -20,7 +20,7 @@ The expected value of the dataset is saved engineering effort. A team that wants
 
 The first data mining goal is corpus construction. The project should produce at least 5,000 accepted pull request workflows, with a target close to 10,000 raw enriched records. A workflow is accepted when it represents a merged pull request with source-code changes, non-empty source patches, review and discussion activity, and no strong bot, documentation-only, generated-only, or trivial-change pattern.
 
-The second data mining goal is supervised prediction of \texttt{review\_concern}. The model receives only pull-request-intrinsic information available at opening time, including metadata, changed-file summaries, and capped code-diff embeddings. It predicts whether later review activity will contain a substantive concern signal, defined by a \texttt{CHANGES\_REQUESTED} review or at least two meaningful review comments.
+The second data mining goal is supervised prediction of \texttt{review\_concern}. The model receives pull-request-intrinsic information from the enriched record, including metadata, changed-file summaries, and capped code-diff embeddings. Review-derived variables are excluded from the feature matrix. The model predicts whether review activity contains a substantive concern signal, defined by a \texttt{CHANGES\_REQUESTED} review or at least two meaningful review comments.
 
 \textbf{Data mining success criteria:} the prepared dataset should pass the size and quality thresholds, and the best held-out model should beat a majority-class baseline on macro-F1 and random ranking on ROC-AUC. These criteria are intentionally modest because the modeling stage is used to validate dataset usefulness, not to claim production readiness.
 

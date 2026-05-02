@@ -61,7 +61,7 @@ def _scorecard(prep: dict[str, Any], modeling: dict[str, Any]) -> pd.DataFrame:
         {
             "criterion": "Demonstrable deployment artifact",
             "target": "usable dataset and demo application",
-            "measured": "Hugging Face dataset and Streamlit demo",
+            "measured": "Hugging Face dataset and runnable Streamlit demo",
             "status": "pass",
             "interpretation": "The result can be inspected and demonstrated, with clear limitations.",
         },

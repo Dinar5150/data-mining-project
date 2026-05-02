@@ -2,7 +2,7 @@
 
 \subsection{Plan Deployment}
 
-The deployment for this project has two demonstration artifacts. The first is the public dataset release on \href{https://huggingface.co/datasets/bulatSharif/gh-pr-issue-traces-10k}{Hugging Face}, which exposes the 10,000-row raw workflow dataset for external inspection and reuse. The second is a local Streamlit application that loads the trained model, lets a user select prepared pull request examples, and displays the predicted probability of \texttt{review\_concern}.
+The deployment for this project has two demonstration artifacts. The first is the public dataset release on \href{https://huggingface.co/datasets/bulatSharif/gh-pr-issue-traces-10k}{Hugging Face}, which exposes the 10,000-row raw workflow dataset for external inspection and reuse. The curated accepted view and modeling splits are produced by the preparation pipeline from this raw release. The second artifact is a local Streamlit application that loads the trained model, lets a user select prepared pull request examples, and displays the predicted probability of \texttt{review\_concern}.
 
 This deployment plan matches the evaluation result. The dataset is useful enough to publish as a data artifact, and the model is useful enough to demonstrate that the dataset carries signal. Therefore, the application is presented as an explanatory demo around the dataset and baseline model.
 
