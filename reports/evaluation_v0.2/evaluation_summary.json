@@ -1,0 +1,68 @@
+{
+  "business_result": "partially_successful",
+  "data_mining_result": "successful_for_baseline_validation",
+  "deployment_result": "demonstration_ready",
+  "huggingface_dataset_url": "https://huggingface.co/datasets/bulatSharif/gh-pr-issue-traces-10k",
+  "streamlit_demo_url": "http://localhost:8501",
+  "accepted_quality_rows": 7373,
+  "raw_rows": 10000,
+  "repositories": 6033,
+  "selected_model": "xgboost_all_features",
+  "test_metrics": {
+    "test_roc_auc": 0.6277895855472901,
+    "test_average_precision": 0.9757713743408221,
+    "test_brier": 0.116554856300354,
+    "test_threshold": 0.4070095241069794,
+    "test_macro_f1": 0.536575240494732,
+    "test_positive_f1": 0.965042372881356,
+    "test_balanced_accuracy": 0.5340595111583422,
+    "test_confusion_matrix": [
+      [
+        4,
+        36
+      ],
+      [
+        30,
+        911
+      ]
+    ]
+  },
+  "scorecard": [
+    {
+      "criterion": "At least 5,000 curated workflows",
+      "target": ">= 5,000 accepted rows",
+      "measured": "7,373",
+      "status": "pass",
+      "interpretation": "The dataset is large enough for the project objective."
+    },
+    {
+      "criterion": "Broad multi-repository coverage",
+      "target": "multi-repository dataset",
+      "measured": "6,033 repositories",
+      "status": "pass",
+      "interpretation": "The collection is not limited to one project or ecosystem."
+    },
+    {
+      "criterion": "Downstream model beats random ranking",
+      "target": "ROC-AUC > 0.500",
+      "measured": "0.628",
+      "status": "pass",
+      "interpretation": "The data contains learnable signal for review-concern ranking."
+    },
+    {
+      "criterion": "Downstream model beats majority baseline",
+      "target": "macro-F1 > 0.490",
+      "measured": "0.537",
+      "status": "pass",
+      "interpretation": "The selected model improves over predicting only the dominant class."
+    },
+    {
+      "criterion": "Demonstrable deployment artifact",
+      "target": "usable dataset and demo application",
+      "measured": "Hugging Face dataset and Streamlit demo",
+      "status": "pass",
+      "interpretation": "The result can be inspected and demonstrated, with clear limitations."
+    }
+  ],
+  "recommendation": "Use the dataset and app as demonstrators, and continue with another CRISP-DM iteration to improve model quality."
+}

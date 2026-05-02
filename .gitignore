@@ -6,6 +6,7 @@ __pycache__/
 *.aux
 *.log
 *.out
+.streamlit_app.log
 enriched_prs_raw.jsonl
 enriched_prs_raw_new.jsonl
 
@@ -21,3 +22,5 @@ reports/*
 !reports/.gitkeep
 !reports/modeling_v0.2/
 !reports/modeling_v0.2/*
+!reports/evaluation_v0.2/
+!reports/evaluation_v0.2/*

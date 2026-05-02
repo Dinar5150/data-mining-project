@@ -1,0 +1,31 @@
+\section{Deployment}
+
+\subsection{Plan Deployment}
+
+The deployment for this project has two demonstration artifacts. The first is the public dataset release on \href{https://huggingface.co/datasets/bulatSharif/gh-pr-issue-traces-10k}{Hugging Face}, which exposes the 10,000-row raw workflow dataset for external inspection and reuse. The second is a local Streamlit application that loads the trained model, lets a user select prepared pull request examples, and displays the predicted probability of \texttt{review\_concern}.
+
+This deployment plan matches the evaluation result. The dataset is useful enough to publish as a data artifact, and the model is useful enough to demonstrate that the dataset carries signal. Therefore, the application is presented as an explanatory demo around the dataset and baseline model.
+
+The main deployment risks are data size, schema complexity, and model misuse. The raw file is about 1.9 GB, so users need streaming or local processing. The hosted dataset viewer currently has difficulty rendering the raw nested JSON schema, even though the file itself is available. This should be fixed in a later release by publishing a flatter Parquet version alongside the raw JSONL. The model risk is that users may overinterpret the probability score; the interface and report should make clear that it is a baseline estimate.
+
+\subsection{Plan Monitoring and Maintenance}
+
+The dataset should be versioned. Each future release should record the collection window, row count, repository count, quality-filter settings, label definition, and known limitations. Monitoring should check whether the number of accepted rows, language distribution, class balance, and missing source-patch rate change substantially across refreshes.
+
+The model should be monitored separately from the dataset. It should be refreshed if the feature schema changes, if class balance shifts strongly, or if held-out ROC-AUC and macro-F1 fall back to baseline levels.
+
+The Streamlit application requires lighter maintenance. It should be kept compatible with the current feature manifest, selected model artifact, and prepared splits. If the model is retrained, the displayed threshold, metrics, and feature importances must be refreshed together.
+
+\subsection{Produce Final Report}
+
+The final report brings together the CRISP-DM phases completed so far: Business Understanding, Data Understanding, Data Preparation, Modeling, Evaluation, and Deployment. Its audience is the course evaluator and a technically informed reader who wants to understand whether the dataset is useful. The report therefore emphasizes the reasoning, criteria, limitations, and final decision, while the notebooks and scripts provide reproducibility.
+
+The final conclusion is that the project is successful as a dataset construction and demonstration project. It is only partially successful as a predictive modeling project, because the selected model improves over baselines but remains weak on the minority class. This distinction is important: the deployable result is the dataset and demo.
+
+\subsection{Review Project}
+
+The main project success was converting noisy public GitHub activity into a coherent workflow dataset and showing that the data supports a non-trivial prediction task. The main technical lesson is that workflow data is richer than isolated code diffs, but also harder to model because review outcomes depend on project conventions, context, and human judgment.
+
+The main weakness was underestimating the difficulty of the label. The positive class is dominant, so simple metrics can look better than the model really is. Another weakness is that the current representation compresses each diff to a fixed embedding and does not reason over the full workflow. If the project were repeated, the process should allocate more time to label design, manual audit, time-based validation, and stronger language-model features.
+
+The overall project decision is to keep the current deployment as a transparent demonstration and to start another CRISP-DM iteration for model improvement.

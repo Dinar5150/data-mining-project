@@ -161,7 +161,7 @@ overview_columns = [
 
 st.dataframe(
     filtered[overview_columns].head(100),
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     column_config={
         "pred_probability": st.column_config.ProgressColumn(
@@ -205,7 +205,7 @@ with meta_left:
                 ["Changed lines", int(selected["diff_lines"])],
             ],
             columns=["Field", "Value"],
-        )
+        ).astype(str)
     )
 
 with meta_right:
@@ -220,7 +220,7 @@ with meta_right:
                 ["Commits", int(selected["commits"])],
             ],
             columns=["Field", "Value"],
-        )
+        ).astype(str)
     )
 
 with st.expander("Numeric what-if", expanded=False):
