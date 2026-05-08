@@ -24,7 +24,7 @@ from pipeline.filters import (
     top_source_language,
 )
 
-DEFAULT_RAW_PATH = "enriched_prs_raw_new.jsonl"
+DEFAULT_RAW_PATH = "data/raw/enriched_prs_raw_new.jsonl"
 DEFAULT_OUTPUT_DIR = "data/processed/modeling_v0.2"
 DEFAULT_DATASET_VERSION = "dataset_modeling_v0.2"
 DEFAULT_EMBEDDING_MODEL = "mlx-community/nomicai-modernbert-embed-base-4bit"

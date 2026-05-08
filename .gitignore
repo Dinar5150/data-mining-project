@@ -1,15 +1,27 @@
+# Environments
 .venv/
+.env
+
+# Python
 __pycache__/
 *.pyc
-.env
+
+# OS / editor
 .DS_Store
+
+# LaTeX build artifacts
 *.aux
 *.log
 *.out
-.streamlit_app.log
-enriched_prs_raw.jsonl
-enriched_prs_raw_new.jsonl
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
 
+# Streamlit
+.streamlit_app.log
+
+# Local data — keep folder skeletons only
 data/candidates/*
 !data/candidates/.gitkeep
 data/raw/*
@@ -18,6 +30,9 @@ data/processed/*
 !data/processed/.gitkeep
 data/audit/*
 !data/audit/.gitkeep
+data/gharchive/
+
+# Reports — keep current run, ignore everything else
 reports/*
 !reports/.gitkeep
 !reports/modeling_v0.2/

@@ -1,181 +1,81 @@
-# GH Trace Dataset MVP
+# Muhomory GitHub Workflow Dataset
 
-Minimal pipeline for collecting engineering traces of the form:
+End-to-end CRISP-DM project that builds a curated dataset of GitHub
+pull-request review traces and trains a baseline `review_concern` classifier
+on top of it.
 
 ```text
-Issue -> Discussion -> PR -> Review -> Code Diff -> Merge
+Issue → Discussion → PR → Review → Code Diff → Merge
 ```
 
-The pipeline follows a strict MVP shape:
-
-1. Use GH Archive in BigQuery or local GH Archive hourly dumps to find candidate merged pull requests.
-2. Enrich those candidates via the GitHub REST API.
-3. Apply hard filters and a simple quality score.
-4. Export accepted and rejected examples for PR quality classification.
-5. Generate train/val/test splits, flat feature tables, Parquet exports, an audit CSV, a dataset card, and a quality report.
+- **Public dataset:** <https://huggingface.co/datasets/bulatSharif/gh-pr-issue-traces-10k>
+- **Report:** [`docs/report/report.pdf`](docs/report/report.pdf)
+- **Full project document:** [`docs/MASTER_CONTEXT.md`](docs/MASTER_CONTEXT.md)
 
 ## Repository Layout
 
-```text
-sql/                    BigQuery SQL templates
-pipeline/               Python modules and CLI
-data/candidates/        Exported BigQuery candidates CSV
-data/raw/               Raw enriched JSONL and failures
-data/processed/         Accepted and rejected dataset variants
-data/audit/             Human audit samples
-reports/                Generated reports
-```
+| Folder | Purpose |
+| --- | --- |
+| [`pipeline/`](pipeline/README.md) | Python package and `python -m pipeline` CLI for every dataset stage. |
+| [`notebooks/`](notebooks/README.md) | CRISP-DM notebooks: data understanding → preparation → modeling → evaluation. |
+| [`sql/`](sql/README.md) | BigQuery templates for the candidate-discovery step. |
+| [`data/`](data/README.md) | Candidate CSVs, raw enriched JSONL, and processed modeling matrices. |
+| [`figures/`](figures/README.md) | Plots used by the report. |
+| [`reports/`](reports/README.md) | Trained model, metrics, and evaluation summaries. |
+| [`app/`](app/README.md) | Streamlit demo of the trained classifier. |
+| [`docs/`](docs/README.md) | Full write-up, deployment guide, dataset card, LaTeX report sources. |
 
-## Setup
-
-Requirements:
-
-- Python 3.10+
-- A GitHub personal access token in `GITHUB_TOKEN`
-- BigQuery access for the candidate search step
-
-Install dependencies:
+## Quick Start
 
 ```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-.\.venv\Scripts\pip.exe install -r requirements.txt
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+export GITHUB_TOKEN=...               # required for enrichment
 ```
 
-## Config
-
-Default settings live in [config.yaml](/C:/Users/Dinar/Desktop/GitHub%20projects/data-mining-project/config.yaml).
-
-Key values to review before running:
-
-- `github.max_workers`
-- `dataset.require_linked_issue`
-- `dataset.store_full_diff`
-- output paths under `output`
-
-## Candidate Discovery
-
-You can build candidate PR CSV files in two ways.
-
-### Option A: BigQuery
-
-Run the SQL templates in `sql/` against GH Archive in BigQuery.
-
-- [sql/01_candidate_prs.sql](/C:/Users/Dinar/Desktop/GitHub%20projects/data-mining-project/sql/01_candidate_prs.sql) builds the candidate table.
-- [sql/02_candidate_stats.sql](/C:/Users/Dinar/Desktop/GitHub%20projects/data-mining-project/sql/02_candidate_stats.sql) inspects distribution and samples.
-
-Export the resulting table to CSV and place it at `data/candidates/candidate_prs_2025.csv` or pass a different path to the CLI.
-
-### Option B: Local GH Archive hourly dumps
-
-Download hourly `.json.gz` files and build the candidate CSV locally with the same event-level candidate filters as the SQL path.
-
-If you already have `wget` in a Unix-like shell, the January 2015 download looks like:
+End-to-end: download → enrich → process → train → evaluate.
 
 ```bash
-wget https://data.gharchive.org/2015-01-{01..31}-{0..23}.json.gz
+# 1. Build candidate PRs (BigQuery — see sql/ — or local GH Archive)
+python -m pipeline download-gharchive --start-date 2025-01-01 --end-date 2025-01-31 \
+    --output-dir data/gharchive/2025-01
+python -m pipeline candidates-from-gharchive \
+    --input-glob "data/gharchive/2025-01/*.json.gz" \
+    --output data/candidates/candidate_prs_2025_01.csv
+
+# 2. Enrich candidates via the GitHub API
+python -m pipeline enrich --candidates-dir data/candidates \
+    --pattern "candidate_prs_2025_*.csv" --limit-total 10000 --sample-seed 42
+
+# 3. Build accepted/rejected datasets, splits, features, audit, report, dataset card
+python -m pipeline finalize
+
+# 4. Train and evaluate the baseline classifier (see notebooks/)
+jupyter lab notebooks/03_modeling.ipynb
+jupyter lab notebooks/04_evaluation_deployment.ipynb
+
+# 5. Run the demo
+python -m streamlit run app/streamlit_app.py
 ```
 
-Note: this brace expansion works in Bash-like shells, not in standard PowerShell. On Windows PowerShell, prefer the built-in downloader below.
+See [`pipeline/README.md`](pipeline/README.md) for the full CLI reference and
+[`docs/MASTER_CONTEXT.md`](docs/MASTER_CONTEXT.md) for the long-form write-up.
 
-If you want a shell-independent method, use the built-in downloader:
+## Configuration
 
-```bash
-.\.venv\Scripts\python.exe -m pipeline download-gharchive --start-date 2015-01-01 --end-date 2015-01-31 --output-dir data/gharchive/2015-01
-```
+All pipeline parameters live in [`config.yaml`](config.yaml). Key knobs:
 
-Then build the candidate CSV:
+- `github.max_workers` — enrichment parallelism (rate-limit aware).
+- `dataset.min_*` / `dataset.max_*` — quality thresholds.
+- `output.*` — every artifact path the CLI reads or writes.
 
-```bash
-.\.venv\Scripts\python.exe -m pipeline candidates-from-gharchive --input-glob "data/gharchive/2015-01/*.json.gz" --output data/candidates/candidate_prs_2015_01.csv
-```
+## Requirements
 
-For a smoke test you can limit the number of hourly files:
+- Python 3.10+
+- A GitHub personal access token in `GITHUB_TOKEN`
+- BigQuery access *or* enough disk space for local GH Archive dumps
 
-```bash
-.\.venv\Scripts\python.exe -m pipeline candidates-from-gharchive --input-glob "data/gharchive/2015-01/*.json.gz" --output data/candidates/candidate_prs_2015_01_smoke.csv --limit-files 24
-```
+## License & Contact
 
-## CLI Workflow
-
-Enrich raw candidates:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline enrich --candidates data/candidates/candidate_prs_2025.csv --limit 1000
-```
-
-Enrich a balanced random sample across all monthly candidate CSVs in a directory:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline enrich --candidates-dir data/candidates --pattern "candidate_prs_2025_*.csv" --limit-total 10000 --sample-seed 42
-```
-
-Preview the overnight selection without making GitHub API calls:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline enrich --candidates-dir data/candidates --pattern "candidate_prs_2025_*.csv" --limit-total 10000 --sample-seed 42 --dry-run
-```
-
-Process enriched rows into accepted and rejected datasets:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline process
-```
-
-Split examples by repository into train/val/test:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline split
-```
-
-Export flat feature tables for modeling:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline features
-```
-
-Export accepted and rejected traces to Parquet:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline export-parquet
-```
-
-Generate an audit sample:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline audit
-```
-
-Generate a markdown quality report:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline report
-```
-
-Export SFT views from the accepted trace dataset:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline sft
-```
-
-Generate a dataset card:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline data-card
-```
-
-Run post-processing in one step:
-
-```bash
-.\.venv\Scripts\python.exe -m pipeline finalize
-```
-
-## Notes
-
-- Enrichment is resumable. The CLI skips PRs already present in the raw or failed JSONL outputs.
-- Directory-mode enrichment samples from pending rows after deduplication and seen-row filtering, so `--limit-total 10000` means up to 10,000 actual API submissions.
-- Multi-file directory mode uses balanced random sampling across matched CSV files and shuffles the final selection globally before submission.
-- Linked issues are detected only via `fixes/closes/resolves #123` style references in the PR title/body.
-- The pipeline intentionally favors precision over recall in the accepted dataset.
-- The baseline downstream task is PR trace quality classification: `accepted` vs `rejected`.
-- `finalize` regenerates accepted/rejected datasets, repo-level splits, feature tables, Parquet exports, SFT views, the audit CSV, the quality report, and the dataset card.
+Authors: Bulat Sharipov, Dinar Yakupov, Danil Fathutdinov, Marsel Berheev, Makar Egorov (DS-01, Innopolis University).

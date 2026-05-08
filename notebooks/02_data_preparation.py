@@ -26,7 +26,7 @@ RUN_PREPARATION = False
 
 if RUN_PREPARATION:
     prepare_modeling_data(
-        raw_path=PROJECT_ROOT / "enriched_prs_raw_new.jsonl",
+        raw_path=PROJECT_ROOT / "data/raw/enriched_prs_raw_new.jsonl",
         output_dir=OUTPUT_DIR,
         config_path=PROJECT_ROOT / "config.yaml",
         token_cap=1000,

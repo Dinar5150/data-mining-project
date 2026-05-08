@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 DATASET_VERSION = "dataset_modeling_v0.2"
 DATA_DIR = ROOT / "data" / "processed" / "modeling_v0.2"
 MODEL_PATH = ROOT / "reports" / "modeling_v0.2" / "selected_model.joblib"
